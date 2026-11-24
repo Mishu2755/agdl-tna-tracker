@@ -26,12 +26,12 @@
           "booked_qty": 0,
           "ih_qty": 0,
           "bal_qty": 0,
-          "updates": "Pending",
+          "updates": "Approved by QA",
           "task_notes": "",
-          "color_approval": "Pending",
-          "status": "Closed",
+          "color_approval": "Lab Dip Approved",
+          "status": "Approved",
           "is_hidden": false,
-          "last_modified": "2026-11-24 11:43"
+          "last_modified": "2026-11-24 15:24"
         },
         {
           "id": "task_16",
@@ -45,10 +45,10 @@
           "bal_qty": 0,
           "updates": "Approved",
           "task_notes": "",
-          "color_approval": "Pending",
+          "color_approval": "Lab Dip Approved",
           "status": "Approved",
           "is_hidden": false,
-          "last_modified": "2026-11-24 11:43"
+          "last_modified": "2026-11-24 15:24"
         },
         {
           "id": "task_17",

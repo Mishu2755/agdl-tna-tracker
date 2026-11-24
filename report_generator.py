@@ -1,8 +1,13 @@
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List
+
+BD_TZ = timezone(timedelta(hours=6))
+
+def get_bd_now() -> datetime:
+    return datetime.now(BD_TZ)
 
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib import colors
@@ -27,7 +32,7 @@ def generate_excel_report(storage_data: Dict[str, Any], output_path: Path) -> Pa
     
     headers1 = [
         "Style", "Garment Qty (Pcs)", "Item Category", "Items", 
-        f"Updates ({datetime.now().strftime('%d-%m-%y')})", "Tasks", 
+        f"Updates ({get_bd_now().strftime('%d-%m-%y')})", "Tasks", 
         "UOM", "Book Qty", "I/H Qty", "Bal Qty", "Color Approval", "Status"
     ]
     
@@ -98,7 +103,7 @@ def generate_excel_report(storage_data: Dict[str, Any], output_path: Path) -> Pa
     # ------------------ SHEET 3: Executive Summary ------------------
     ws3 = wb.create_sheet(title="Sheet3")
     ws3.freeze_panes = "A2" # Freeze 1st row
-    headers3 = ["Style", "Garment Qty (Pcs)", "Item Category", "Items", f"Updates ({datetime.now().strftime('%d-%m-%y')})", "Tasks"]
+    headers3 = ["Style", "Garment Qty (Pcs)", "Item Category", "Items", f"Updates ({get_bd_now().strftime('%d-%m-%y')})", "Tasks"]
     ws3.append(headers3)
     
     header_fill3 = PatternFill(start_color="203764", end_color="203764", fill_type="solid")
@@ -212,7 +217,7 @@ def generate_pdf_report(storage_data: Dict[str, Any], output_path: Path) -> Path
     )
 
     buyer_name = storage_data.get("selected_buyer", {}).get("name", "All Buyers")
-    now_str = datetime.now().strftime("%d-%b-%Y %H:%M")
+    now_str = get_bd_now().strftime("%d-%b-%Y %I:%M %p")
 
     elements = []
 

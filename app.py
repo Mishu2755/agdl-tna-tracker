@@ -4,7 +4,7 @@ import json
 import time
 from pathlib import Path
 from datetime import datetime
-from flask import Flask, render_template_string, request, jsonify, send_file, redirect, url_for, Response
+from flask import Flask, render_template_string, request, jsonify, send_file, redirect, url_for, Response, session
 
 from erp_client import ERPClient
 from storage import TNAStorage
@@ -76,13 +76,13 @@ HTML_TEMPLATE = """
                 </div>
 
                 <!-- Export Excel -->
-                <a href="/export/excel" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center space-x-1.5 shadow transition">
+                <a href="/export/excel?buyer={{ current_buyer.code }}" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center space-x-1.5 shadow transition">
                     <i class="fa-solid fa-file-excel text-sm"></i>
                     <span>Export Excel</span>
                 </a>
 
                 <!-- Export PDF (A4 Full Width) -->
-                <a href="/export/pdf" target="_blank" class="bg-red-600 hover:bg-red-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center space-x-1.5 shadow transition">
+                <a href="/export/pdf?buyer={{ current_buyer.code }}" target="_blank" class="bg-red-600 hover:bg-red-500 text-white text-xs font-semibold px-3 py-2 rounded-lg flex items-center space-x-1.5 shadow transition">
                     <i class="fa-solid fa-file-pdf text-sm"></i>
                     <span>A4 PDF Report</span>
                 </a>
@@ -177,6 +177,21 @@ HTML_TEMPLATE = """
                 </button>
             </div>
 
+            <!-- Bulk Action for Selected Items & Selection Controls -->
+            <div class="flex flex-wrap items-center gap-2">
+                <button id="bulkActionBtn" onclick="openBulkActionModal()" disabled class="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center space-x-1.5 shadow-sm transition">
+                    <i class="fa-solid fa-list-check"></i>
+                    <span>Action for Selected Items</span>
+                    <span id="selectedCountBadge" class="hidden bg-white text-indigo-700 font-bold px-1.5 py-0.2 rounded-full text-[10px]">0</span>
+                </button>
+                <button onclick="toggleSelectAllVisible()" id="btnSelectAllVisible" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold px-2 py-1 rounded hover:bg-indigo-50 transition">
+                    Select All Visible
+                </button>
+                <button onclick="clearAllSelections()" id="btnClearSelections" class="hidden text-xs text-slate-500 hover:text-red-600 font-medium px-2 py-1 rounded hover:bg-red-50 transition">
+                    Clear Selection
+                </button>
+            </div>
+
             <!-- Specific Item Quick Filter (Fabric, Sewing Thread, Poly, Carton, etc.) -->
             <div class="flex items-center space-x-2">
                 <span class="text-xs font-medium text-slate-500">Quick Item Filter:</span>
@@ -265,16 +280,19 @@ HTML_TEMPLATE = """
                     <table class="w-full text-left text-xs border-collapse table-fixed">
                         <thead>
                             <tr class="bg-slate-100/90 text-slate-600 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
+                                <th class="py-2.5 px-2 w-[35px] text-center">
+                                    <input type="checkbox" title="Select/Deselect all visible items in this style" onchange="toggleSelectStyleItems('{{ style_id }}', this.checked)" class="style-select-all rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 cursor-pointer">
+                                </th>
                                 <th class="py-2.5 px-3 w-[100px]">Category</th>
-                                <th class="py-2.5 px-3 w-[160px]">Item / Event</th>
-                                <th class="py-2.5 px-3 w-[34%]">Latest Status / Update Note</th>
-                                <th class="py-2.5 px-3 w-[26%]">Task / Action Note</th>
-                                <th class="py-2.5 px-2 w-[75px] text-right">Book Qty</th>
-                                <th class="py-2.5 px-2 w-[75px] text-right">I/H Qty</th>
-                                <th class="py-2.5 px-2 w-[75px] text-right">Bal Qty</th>
-                                <th class="py-2.5 px-2 w-[100px] text-center">Color Approval</th>
+                                <th class="py-2.5 px-3 w-[155px]">Item / Event</th>
+                                <th class="py-2.5 px-3 w-[33%]">Latest Status / Update Note</th>
+                                <th class="py-2.5 px-3 w-[24%]">Task / Action Note</th>
+                                <th class="py-2.5 px-2 w-[70px] text-right">Book Qty</th>
+                                <th class="py-2.5 px-2 w-[70px] text-right">I/H Qty</th>
+                                <th class="py-2.5 px-2 w-[70px] text-right">Bal Qty</th>
+                                <th class="py-2.5 px-2 w-[95px] text-center">Color Approval</th>
                                 <th class="py-2.5 px-2 w-[85px] text-center">Status</th>
-                                <th class="py-2.5 px-1 w-[40px] text-center">Del</th>
+                                <th class="py-2.5 px-1 w-[35px] text-center">Del</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
@@ -291,6 +309,11 @@ HTML_TEMPLATE = """
                                 id="row_{{ style_id }}_{{ t.id }}" 
                                 data-category="{{ t.category }}" 
                                 data-item-name="{{ t.item_name|lower }}">
+                                <td class="py-2 px-2 align-top text-center pt-2.5">
+                                    <input type="checkbox" class="task-select-cb rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 cursor-pointer" 
+                                        data-style-id="{{ style_id }}" data-task-id="{{ t.id }}" 
+                                        onchange="onTaskSelectChange(this)">
+                                </td>
                                 <td class="py-2 px-3 align-top">
                                     <span class="inline-block px-2 py-0.5 rounded text-[10px] font-semibold 
                                         {% if t.category == 'Basic' %}bg-blue-50 text-blue-700 border border-blue-200
@@ -305,13 +328,13 @@ HTML_TEMPLATE = """
                                     {{ t.item_name }}
                                 </td>
                                 <td class="py-2 px-3 align-top">
-                                    <textarea oninput="autoExpandTextarea(this)" 
+                                    <textarea data-field="updates" oninput="autoExpandTextarea(this)" 
                                         onblur="saveField('{{ style_id }}', '{{ t.id }}', 'updates', this.value)" 
                                         class="auto-expand w-full bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-slate-300 focus:border-blue-500 p-1.5 rounded text-xs transition focus:outline-none text-slate-700" 
                                         rows="1">{{ t.updates }}</textarea>
                                 </td>
                                 <td class="py-2 px-3 align-top">
-                                    <textarea oninput="autoExpandTextarea(this)" 
+                                    <textarea data-field="task_notes" oninput="autoExpandTextarea(this)" 
                                         onblur="saveField('{{ style_id }}', '{{ t.id }}', 'task_notes', this.value)" 
                                         class="auto-expand w-full bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-slate-300 focus:border-blue-500 p-1.5 rounded text-xs transition focus:outline-none text-slate-600" 
                                         placeholder="Add notes..."
@@ -328,12 +351,12 @@ HTML_TEMPLATE = """
                                 </td>
                                 <!-- Editable Color Approval Field -->
                                 <td class="py-2 px-2 align-top text-center">
-                                    <input type="text" value="{{ t.color_approval or 'Pending' }}" 
+                                    <input type="text" data-field="color_approval" value="{{ t.color_approval or 'Pending' }}" 
                                         onblur="saveField('{{ style_id }}', '{{ t.id }}', 'color_approval', this.value)" 
                                         class="w-full text-center bg-transparent hover:bg-white focus:bg-white border border-transparent hover:border-slate-300 focus:border-blue-500 px-1 py-0.5 rounded text-[11px] font-medium text-slate-700 focus:outline-none">
                                 </td>
                                 <td class="py-2 px-2 align-top text-center">
-                                    <select onchange="saveField('{{ style_id }}', '{{ t.id }}', 'status', this.value)" 
+                                    <select data-field="status" onchange="saveField('{{ style_id }}', '{{ t.id }}', 'status', this.value)" 
                                         class="text-[10px] font-semibold rounded px-1.5 py-0.5 border cursor-pointer focus:outline-none 
                                         {% if is_closed %}bg-emerald-100 text-emerald-800 border-emerald-300
                                         {% elif t.status == 'In Progress' %}bg-amber-100 text-amber-800 border-amber-300
@@ -413,6 +436,87 @@ HTML_TEMPLATE = """
             <div class="flex justify-end space-x-2 pt-2">
                 <button onclick="closeAddTaskModal()" class="bg-slate-100 text-slate-700 text-xs font-semibold px-4 py-2 rounded-xl">Cancel</button>
                 <button onclick="submitCustomTask()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-xl">Save Task</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Action for Selected Items Modal -->
+    <div id="bulkActionModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-100 overflow-hidden transform transition-all">
+            <!-- Modal Header -->
+            <div class="bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-4 text-white flex items-center justify-between">
+                <div class="flex items-center space-x-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-sm font-bold">
+                        <i class="fa-solid fa-layer-group"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-sm">Action for Selected Items</h3>
+                        <p class="text-[11px] text-indigo-100"><span id="bulkModalCount">0</span> items selected across styles</p>
+                    </div>
+                </div>
+                <button onclick="closeBulkActionModal()" class="text-white/80 hover:text-white transition p-1">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+
+            <!-- Modal Form Body -->
+            <div class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                        1. Select Field to Update
+                    </label>
+                    <select id="bulkFieldSelect" onchange="onBulkFieldChanged(this.value)" class="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50">
+                        <option value="updates">Latest Status / Update Note</option>
+                        <option value="task_notes">Task / Action Note</option>
+                        <option value="color_approval">Color Approval</option>
+                        <option value="status">Status</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                        2. Desired Data / Value to Place
+                    </label>
+                    
+                    <!-- Textarea for Updates & Task Notes -->
+                    <div id="bulkValueTextWrapper">
+                        <textarea id="bulkValueText" rows="3" placeholder="Enter note or status update (e.g. Approved, Closed, Booking in progress...)" class="w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                        <p class="text-[10px] text-slate-400 mt-1">Tip: Setting note to 'Closed', 'Done', or 'Approved' automatically updates task Status as well.</p>
+                    </div>
+
+                    <!-- Dropdown for Status -->
+                    <div id="bulkValueStatusWrapper" class="hidden">
+                        <select id="bulkValueStatus" class="w-full border border-slate-200 rounded-lg p-2.5 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white">
+                            <option value="Pending">Pending</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Approved">Approved</option>
+                            <option value="Closed">Closed</option>
+                            <option value="Done">Done</option>
+                        </select>
+                    </div>
+
+                    <!-- Input & Quick buttons for Color Approval -->
+                    <div id="bulkValueColorWrapper" class="hidden">
+                        <input type="text" id="bulkValueColor" placeholder="e.g. Approved, Pending, Submitted" class="w-full border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <div class="flex flex-wrap gap-1 mt-2">
+                            <button type="button" onclick="setBulkColorValue('Approved')" class="px-2 py-0.5 text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 rounded hover:bg-emerald-100 font-medium">Approved</button>
+                            <button type="button" onclick="setBulkColorValue('Pending')" class="px-2 py-0.5 text-[10px] bg-slate-100 text-slate-700 border border-slate-200 rounded hover:bg-slate-200 font-medium">Pending</button>
+                            <button type="button" onclick="setBulkColorValue('Submitted')" class="px-2 py-0.5 text-[10px] bg-blue-50 text-blue-700 border border-blue-200 rounded hover:bg-blue-100 font-medium">Submitted</button>
+                            <button type="button" onclick="setBulkColorValue('Rejected')" class="px-2 py-0.5 text-[10px] bg-red-50 text-red-700 border border-red-200 rounded hover:bg-red-100 font-medium">Rejected</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="bg-slate-50 px-6 py-3.5 border-t border-slate-100 flex items-center justify-end space-x-2">
+                <button onclick="closeBulkActionModal()" class="px-3.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-800 transition">
+                    Cancel
+                </button>
+                <button onclick="submitBulkAction()" id="btnSubmitBulk" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow-md transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-check"></i>
+                    <span>Submit & Update</span>
+                </button>
             </div>
         </div>
     </div>
@@ -580,6 +684,9 @@ HTML_TEMPLATE = """
             }
         }
 
+        const currentBuyerCode = "{{ current_buyer.code }}";
+        let selectedTasks = new Set();
+
         function startSyncInhoused() {
             const btn = document.getElementById('btnSync');
             const icon = document.getElementById('syncIcon');
@@ -588,7 +695,7 @@ HTML_TEMPLATE = """
 
             updateProgress(5, "Connecting to ERP for Inhoused updates...");
 
-            const evtSource = new EventSource('/api/stream/sync-inhoused');
+            const evtSource = new EventSource('/api/stream/sync-inhoused?buyer=' + encodeURIComponent(currentBuyerCode));
             evtSource.onmessage = function(e) {
                 const data = JSON.parse(e.data);
                 updateProgress(data.percent, data.message);
@@ -617,7 +724,7 @@ HTML_TEMPLATE = """
 
             updateProgress(5, "Scanning ERP Running Styles & checking PO FFD dates...");
 
-            const evtSource = new EventSource('/api/stream/check-add-new-styles');
+            const evtSource = new EventSource('/api/stream/check-add-new-styles?buyer=' + encodeURIComponent(currentBuyerCode));
             evtSource.onmessage = function(e) {
                 const data = JSON.parse(e.data);
                 updateProgress(data.percent, data.message);
@@ -638,20 +745,30 @@ HTML_TEMPLATE = """
             };
         }
 
-        async function changeBuyer(buyerCode) {
-            showToast("Switching buyer...");
-            const resp = await fetch('/api/set-buyer', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({code: buyerCode})
-            });
-            if (resp.ok) {
-                window.location.reload();
-            }
+        function changeBuyer(buyerCode) {
+            showToast("Loading buyer data...");
+            window.location.href = '/?buyer=' + encodeURIComponent(buyerCode);
         }
 
         async function saveField(styleId, taskId, field, value) {
-            await fetch('/api/update-task', {
+            let autoStatus = null;
+            if (field === 'updates') {
+                const v = (value || '').toLowerCase();
+                if (v.includes('closed')) autoStatus = 'Closed';
+                else if (v.includes('done')) autoStatus = 'Done';
+                else if (v.includes('approved')) autoStatus = 'Approved';
+            }
+
+            const row = document.getElementById(`row_${styleId}_${taskId}`);
+            if (autoStatus && row) {
+                const statusSelect = row.querySelector('select[data-field="status"]');
+                if (statusSelect) {
+                    statusSelect.value = autoStatus;
+                    updateStatusStyle(statusSelect, autoStatus, row);
+                }
+            }
+
+            const resp = await fetch('/api/update-task', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
@@ -661,7 +778,242 @@ HTML_TEMPLATE = """
                     value: value
                 })
             });
+
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.updated && data.updated.status && row) {
+                    const statusSelect = row.querySelector('select[data-field="status"]');
+                    if (statusSelect) {
+                        statusSelect.value = data.updated.status;
+                        updateStatusStyle(statusSelect, data.updated.status, row);
+                    }
+                    if (document.getElementById('hideCompletedCheck')?.checked) {
+                        applyFilters();
+                    }
+                }
+            }
             showToast("Saved & Persisted");
+        }
+
+        function updateStatusStyle(selectEl, status, row) {
+            selectEl.className = "text-[10px] font-semibold rounded px-1.5 py-0.5 border cursor-pointer focus:outline-none transition ";
+            const s = (status || '').toLowerCase();
+            if (s === 'closed' || s === 'done' || s === 'approved') {
+                selectEl.className += "bg-emerald-100 text-emerald-800 border-emerald-300";
+                if (row) row.classList.add('is-closed-task');
+            } else if (s === 'in progress') {
+                selectEl.className += "bg-amber-100 text-amber-800 border-amber-300";
+                if (row) row.classList.remove('is-closed-task');
+            } else {
+                selectEl.className += "bg-slate-100 text-slate-700 border-slate-300";
+                if (row) row.classList.remove('is-closed-task');
+            }
+        }
+
+        function onTaskSelectChange(cb) {
+            const key = cb.getAttribute('data-style-id') + ':::' + cb.getAttribute('data-task-id');
+            if (cb.checked) {
+                selectedTasks.add(key);
+            } else {
+                selectedTasks.delete(key);
+            }
+            updateSelectedCount();
+        }
+
+        function updateSelectedCount() {
+            const count = selectedTasks.size;
+            const btn = document.getElementById('bulkActionBtn');
+            const badge = document.getElementById('selectedCountBadge');
+            const btnClear = document.getElementById('btnClearSelections');
+            
+            if (count > 0) {
+                btn.disabled = false;
+                badge.innerText = count;
+                badge.classList.remove('hidden');
+                btnClear.classList.remove('hidden');
+            } else {
+                btn.disabled = true;
+                badge.innerText = '0';
+                badge.classList.add('hidden');
+                btnClear.classList.add('hidden');
+            }
+            const modalCount = document.getElementById('bulkModalCount');
+            if (modalCount) modalCount.innerText = count;
+        }
+
+        function toggleSelectStyleItems(styleId, checked) {
+            const body = document.getElementById(`body_${styleId}`);
+            if (!body) return;
+            const cbs = body.querySelectorAll('.task-select-cb');
+            cbs.forEach(cb => {
+                const row = cb.closest('.task-row');
+                if (row && row.style.display !== 'none') {
+                    cb.checked = checked;
+                    const key = cb.getAttribute('data-style-id') + ':::' + cb.getAttribute('data-task-id');
+                    if (checked) selectedTasks.add(key);
+                    else selectedTasks.delete(key);
+                }
+            });
+            updateSelectedCount();
+        }
+
+        function toggleSelectAllVisible() {
+            const visibleRows = document.querySelectorAll('.task-row');
+            let anyUnchecked = false;
+            visibleRows.forEach(row => {
+                if (row.style.display !== 'none') {
+                    const cb = row.querySelector('.task-select-cb');
+                    if (cb && !cb.checked) anyUnchecked = true;
+                }
+            });
+
+            const setChecked = anyUnchecked;
+            visibleRows.forEach(row => {
+                if (row.style.display !== 'none') {
+                    const cb = row.querySelector('.task-select-cb');
+                    if (cb) {
+                        cb.checked = setChecked;
+                        const key = cb.getAttribute('data-style-id') + ':::' + cb.getAttribute('data-task-id');
+                        if (setChecked) selectedTasks.add(key);
+                        else selectedTasks.delete(key);
+                    }
+                }
+            });
+            document.querySelectorAll('.style-select-all').forEach(sa => sa.checked = setChecked);
+            updateSelectedCount();
+            showToast(setChecked ? "Selected all visible items" : "Deselected all items");
+        }
+
+        function clearAllSelections() {
+            selectedTasks.clear();
+            document.querySelectorAll('.task-select-cb').forEach(cb => cb.checked = false);
+            document.querySelectorAll('.style-select-all').forEach(sa => sa.checked = false);
+            updateSelectedCount();
+        }
+
+        function openBulkActionModal() {
+            if (selectedTasks.size === 0) return;
+            document.getElementById('bulkModalCount').innerText = selectedTasks.size;
+            document.getElementById('bulkActionModal').classList.remove('hidden');
+            onBulkFieldChanged(document.getElementById('bulkFieldSelect').value);
+        }
+
+        function closeBulkActionModal() {
+            document.getElementById('bulkActionModal').classList.add('hidden');
+        }
+
+        function onBulkFieldChanged(field) {
+            const textWrap = document.getElementById('bulkValueTextWrapper');
+            const statusWrap = document.getElementById('bulkValueStatusWrapper');
+            const colorWrap = document.getElementById('bulkValueColorWrapper');
+
+            textWrap.classList.add('hidden');
+            statusWrap.classList.add('hidden');
+            colorWrap.classList.add('hidden');
+
+            if (field === 'status') {
+                statusWrap.classList.remove('hidden');
+            } else if (field === 'color_approval') {
+                colorWrap.classList.remove('hidden');
+            } else {
+                textWrap.classList.remove('hidden');
+                document.getElementById('bulkValueText').placeholder = field === 'updates' ? 
+                    'Enter latest status / update note (e.g. Approved, Closed, Done, Booking in progress...)' : 
+                    'Enter action note or remarks...';
+            }
+        }
+
+        function setBulkColorValue(val) {
+            document.getElementById('bulkValueColor').value = val;
+        }
+
+        async function submitBulkAction() {
+            if (selectedTasks.size === 0) return;
+            const field = document.getElementById('bulkFieldSelect').value;
+            let value = '';
+
+            if (field === 'status') {
+                value = document.getElementById('bulkValueStatus').value;
+            } else if (field === 'color_approval') {
+                value = document.getElementById('bulkValueColor').value.trim() || 'Pending';
+            } else {
+                value = document.getElementById('bulkValueText').value.trim();
+            }
+
+            const items = [];
+            selectedTasks.forEach(key => {
+                const [styleId, taskId] = key.split(':::');
+                items.push({style_id: styleId, task_id: taskId});
+            });
+
+            const btn = document.getElementById('btnSubmitBulk');
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i><span>Applying...</span>`;
+
+            try {
+                const resp = await fetch('/api/bulk-update-tasks', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        items: items,
+                        field: field,
+                        value: value
+                    })
+                });
+
+                if (resp.ok) {
+                    const data = await resp.json();
+                    items.forEach(it => {
+                        const row = document.getElementById(`row_${it.style_id}_${it.task_id}`);
+                        if (row) {
+                            if (field === 'updates') {
+                                const ta = row.querySelector('textarea[data-field="updates"]');
+                                if (ta) {
+                                    ta.value = value;
+                                    autoExpandTextarea(ta);
+                                }
+                                if (data.updated && data.updated.status) {
+                                    const sel = row.querySelector('select[data-field="status"]');
+                                    if (sel) {
+                                        sel.value = data.updated.status;
+                                        updateStatusStyle(sel, data.updated.status, row);
+                                    }
+                                }
+                            } else if (field === 'task_notes') {
+                                const ta = row.querySelector('textarea[data-field="task_notes"]');
+                                if (ta) {
+                                    ta.value = value;
+                                    autoExpandTextarea(ta);
+                                }
+                            } else if (field === 'color_approval') {
+                                const inp = row.querySelector('input[data-field="color_approval"]');
+                                if (inp) inp.value = value;
+                            } else if (field === 'status') {
+                                const sel = row.querySelector('select[data-field="status"]');
+                                if (sel) {
+                                    sel.value = value;
+                                    updateStatusStyle(sel, value, row);
+                                }
+                            }
+                        }
+                    });
+
+                    closeBulkActionModal();
+                    clearAllSelections();
+                    showToast(`Updated ${data.count} items successfully!`);
+
+                    if (document.getElementById('hideCompletedCheck')?.checked) {
+                        applyFilters();
+                    }
+                } else {
+                    showToast("Failed to apply bulk update", true);
+                }
+            } catch (e) {
+                showToast("Error updating items: " + e.message, true);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-check"></i><span>Submit & Update</span>`;
+            }
         }
 
         async function deleteTask(styleId, taskId) {
@@ -753,7 +1105,14 @@ HTML_TEMPLATE = """
 @app.route("/")
 def index():
     buyers = erp.get_buyers()
-    current_buyer = storage.get_buyer()
+    buyer_code = request.args.get("buyer") or session.get("buyer_code") or "C/20/1"
+    session["buyer_code"] = buyer_code
+
+    if buyer_code == "ALL":
+        current_buyer = {"code": "ALL", "name": "All Buyers"}
+    else:
+        current_buyer = next((b for b in buyers if b["code"] == buyer_code), {"code": "C/20/1", "name": "Kmart"})
+
     styles = storage.get_styles_by_buyer(current_buyer.get("code"))
 
     items_set = set()
@@ -788,21 +1147,20 @@ def index():
 def set_buyer():
     data = request.json or {}
     code = data.get("code")
-    if code == "ALL":
-        storage.set_buyer("ALL", "All Buyers")
-        return jsonify({"success": True})
-    buyers = erp.get_buyers()
-    matched = next((b for b in buyers if b["code"] == code), None)
-    if matched:
-        storage.set_buyer(matched["code"], matched["name"])
-        return jsonify({"success": True})
-    return jsonify({"success": False, "message": "Buyer not found"}), 404
+    session["buyer_code"] = code
+    return jsonify({"success": True})
 
 @app.route("/api/stream/check-add-new-styles")
 def stream_check_add_new_styles():
     """Server-Sent Events (SSE) streaming progress while scanning ERP for running styles."""
+    buyer_code = request.args.get("buyer") or session.get("buyer_code") or "C/20/1"
+    buyers = erp.get_buyers()
+    if buyer_code == "ALL":
+        buyer = {"code": "C/20/1", "name": "Kmart"}
+    else:
+        buyer = next((b for b in buyers if b["code"] == buyer_code), {"code": "C/20/1", "name": "Kmart"})
+
     def generate():
-        buyer = storage.get_buyer()
         buyer_name = buyer.get("name", "")
         yield f"data: {json.dumps({'percent': 10, 'message': f'Fetching styles for {buyer_name}...', 'done': False})}\n\n"
         
@@ -851,16 +1209,17 @@ def stream_check_add_new_styles():
             added_count += 1
 
         storage.set_last_synced()
-        yield f"data: {json.dumps({'percent': 100, 'message': f'Completed! Added {added_count} running style(s).', 'done': True})}\n\n"
+        yield f"data: {json.dumps({'percent': 100, 'message': f'Completed! Added {added_count} running style(s) for {buyer_name}.', 'done': True})}\n\n"
 
     return Response(generate(), mimetype="text/event-stream")
 
 @app.route("/api/stream/sync-inhoused")
 def stream_sync_inhoused():
     """Server-Sent Events (SSE) streaming progress while syncing Inhoused BOM quantities."""
+    buyer_code = request.args.get("buyer") or session.get("buyer_code") or "C/20/1"
+
     def generate():
-        buyer = storage.get_buyer()
-        styles = storage.get_styles_by_buyer(buyer.get("code"))
+        styles = storage.get_styles_by_buyer(buyer_code)
         costing_ids = list(styles.keys())
         total = len(costing_ids)
         
@@ -923,9 +1282,42 @@ def update_task_field():
     value = data.get("value")
 
     if style_id and task_id and field:
-        storage.update_task(style_id, task_id, {field: value})
-        return jsonify({"success": True})
+        update_dict = {field: value}
+        if field == "updates":
+            val_lower = str(value).strip().lower()
+            if "closed" in val_lower:
+                update_dict["status"] = "Closed"
+            elif "done" in val_lower:
+                update_dict["status"] = "Done"
+            elif "approved" in val_lower:
+                update_dict["status"] = "Approved"
+
+        storage.update_task(style_id, task_id, update_dict)
+        return jsonify({"success": True, "updated": update_dict})
     return jsonify({"success": False}), 400
+
+@app.route("/api/bulk-update-tasks", methods=["POST"])
+def bulk_update_tasks_route():
+    data = request.json or {}
+    items = data.get("items", [])
+    field = data.get("field")
+    value = data.get("value")
+
+    if not items or not field:
+        return jsonify({"success": False, "message": "Missing items or field"}), 400
+
+    update_dict = {field: value}
+    if field == "updates":
+        val_lower = str(value).strip().lower()
+        if "closed" in val_lower:
+            update_dict["status"] = "Closed"
+        elif "done" in val_lower:
+            update_dict["status"] = "Done"
+        elif "approved" in val_lower:
+            update_dict["status"] = "Approved"
+
+    count = storage.bulk_update_tasks(items, update_dict)
+    return jsonify({"success": True, "count": count, "updated": update_dict})
 
 @app.route("/api/add-manual-style", methods=["POST"])
 def add_manual_style():
@@ -938,7 +1330,10 @@ def add_manual_style():
     bom_items = erp.get_bom_inhoused_status(costing_id) if "B-" in costing_id else []
     tasks = generate_style_tasks(costing_items, bom_items, garment_qty=garment_qty)
 
-    current_buyer = storage.get_buyer()
+    buyer_code = session.get("buyer_code") or "C/20/1"
+    buyers = erp.get_buyers()
+    current_buyer = next((b for b in buyers if b["code"] == buyer_code), {"code": "C/20/1", "name": "Kmart"})
+
     storage.upsert_style(costing_id, {
         "style_name": name,
         "costing_id": costing_id,
@@ -994,7 +1389,13 @@ def delete_task():
 
 @app.route("/export/excel")
 def export_excel():
-    current_buyer = storage.get_buyer()
+    buyer_code = request.args.get("buyer") or session.get("buyer_code") or "C/20/1"
+    buyers = erp.get_buyers()
+    if buyer_code == "ALL":
+        current_buyer = {"code": "ALL", "name": "All Buyers"}
+    else:
+        current_buyer = next((b for b in buyers if b["code"] == buyer_code), {"code": "C/20/1", "name": "Kmart"})
+
     styles = storage.get_styles_by_buyer(current_buyer.get("code"))
     data_to_export = {
         "selected_buyer": current_buyer,
@@ -1006,7 +1407,13 @@ def export_excel():
 
 @app.route("/export/pdf")
 def export_pdf():
-    current_buyer = storage.get_buyer()
+    buyer_code = request.args.get("buyer") or session.get("buyer_code") or "C/20/1"
+    buyers = erp.get_buyers()
+    if buyer_code == "ALL":
+        current_buyer = {"code": "ALL", "name": "All Buyers"}
+    else:
+        current_buyer = next((b for b in buyers if b["code"] == buyer_code), {"code": "C/20/1", "name": "Kmart"})
+
     styles = storage.get_styles_by_buyer(current_buyer.get("code"))
     data_to_export = {
         "selected_buyer": current_buyer,
