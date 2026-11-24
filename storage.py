@@ -39,6 +39,15 @@ class TNAStorage:
     def get_styles(self) -> Dict[str, Any]:
         return self.data.get("styles", {})
 
+    def get_styles_by_buyer(self, buyer_code: Optional[str] = None) -> Dict[str, Any]:
+        all_styles = self.get_styles()
+        if not buyer_code or buyer_code == "ALL":
+            return all_styles
+        return {
+            sid: s for sid, s in all_styles.items()
+            if s.get("buyer_code") == buyer_code or (not s.get("buyer_code") and buyer_code == "C/20/1")
+        }
+
     def get_style(self, costing_id: str) -> Optional[Dict[str, Any]]:
         return self.data.get("styles", {}).get(costing_id)
 

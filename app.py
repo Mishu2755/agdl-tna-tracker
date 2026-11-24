@@ -64,6 +64,9 @@ HTML_TEMPLATE = """
                 <div class="flex items-center space-x-2 bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700">
                     <i class="fa-solid fa-user-tag text-blue-400 text-xs"></i>
                     <select id="buyerSelect" onchange="changeBuyer(this.value)" class="bg-transparent text-xs font-semibold text-white focus:outline-none cursor-pointer">
+                        <option value="ALL" class="bg-slate-800 text-white" {% if current_buyer.code == 'ALL' %}selected{% endif %}>
+                            -- All Buyers --
+                        </option>
                         {% for b in buyers %}
                         <option value="{{ b.code }}" class="bg-slate-800 text-white" {% if b.code == current_buyer.code %}selected{% endif %}>
                             {{ b.name }}
@@ -751,7 +754,7 @@ HTML_TEMPLATE = """
 def index():
     buyers = erp.get_buyers()
     current_buyer = storage.get_buyer()
-    styles = storage.get_styles()
+    styles = storage.get_styles_by_buyer(current_buyer.get("code"))
 
     items_set = set()
     total_styles = len(styles)
@@ -785,6 +788,9 @@ def index():
 def set_buyer():
     data = request.json or {}
     code = data.get("code")
+    if code == "ALL":
+        storage.set_buyer("ALL", "All Buyers")
+        return jsonify({"success": True})
     buyers = erp.get_buyers()
     matched = next((b for b in buyers if b["code"] == code), None)
     if matched:
@@ -830,6 +836,8 @@ def stream_check_add_new_styles():
             storage.upsert_style(costing_id, {
                 "style_name": s_name,
                 "costing_id": costing_id,
+                "buyer_code": buyer["code"],
+                "buyer_name": buyer["name"],
                 "ocb_id": st.get("ocb_id"),
                 "garment_qty": garment_qty,
                 "garment_type": st.get("garment_type"),
@@ -851,7 +859,8 @@ def stream_check_add_new_styles():
 def stream_sync_inhoused():
     """Server-Sent Events (SSE) streaming progress while syncing Inhoused BOM quantities."""
     def generate():
-        styles = storage.get_styles()
+        buyer = storage.get_buyer()
+        styles = storage.get_styles_by_buyer(buyer.get("code"))
         costing_ids = list(styles.keys())
         total = len(costing_ids)
         
@@ -929,9 +938,12 @@ def add_manual_style():
     bom_items = erp.get_bom_inhoused_status(costing_id) if "B-" in costing_id else []
     tasks = generate_style_tasks(costing_items, bom_items, garment_qty=garment_qty)
 
+    current_buyer = storage.get_buyer()
     storage.upsert_style(costing_id, {
         "style_name": name,
         "costing_id": costing_id,
+        "buyer_code": current_buyer.get("code"),
+        "buyer_name": current_buyer.get("name"),
         "garment_qty": garment_qty,
         "garment_type": "Manual",
         "oc_date": "N/A",
@@ -982,14 +994,26 @@ def delete_task():
 
 @app.route("/export/excel")
 def export_excel():
+    current_buyer = storage.get_buyer()
+    styles = storage.get_styles_by_buyer(current_buyer.get("code"))
+    data_to_export = {
+        "selected_buyer": current_buyer,
+        "styles": styles
+    }
     output_path = BASE_DIR / f"AGDL_TNA_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-    generate_excel_report(storage.data, output_path)
+    generate_excel_report(data_to_export, output_path)
     return send_file(output_path, as_attachment=True, download_name=output_path.name)
 
 @app.route("/export/pdf")
 def export_pdf():
+    current_buyer = storage.get_buyer()
+    styles = storage.get_styles_by_buyer(current_buyer.get("code"))
+    data_to_export = {
+        "selected_buyer": current_buyer,
+        "styles": styles
+    }
     output_path = BASE_DIR / f"AGDL_TNA_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-    generate_pdf_report(storage.data, output_path)
+    generate_pdf_report(data_to_export, output_path)
     return send_file(output_path, as_attachment=True, download_name=output_path.name)
 
 if __name__ == "__main__":

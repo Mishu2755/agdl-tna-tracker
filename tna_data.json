@@ -343,7 +343,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-897": {
       "style_name": "26NS27JPA849 - BLACK - R1",
@@ -699,7 +701,9 @@
           "status": "Closed",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-898": {
       "style_name": "26NS27JPA849 - GRY CASTLE - R1",
@@ -1065,7 +1069,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-1036": {
       "style_name": "26NS27JPA417 - GRN SMKOLV",
@@ -1511,7 +1517,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-1037": {
       "style_name": "26NS27JPA417 - MLKY BRWN",
@@ -1941,7 +1949,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-1034": {
       "style_name": "26NS27JPA849 - BLACK - R2",
@@ -2307,7 +2317,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-1035": {
       "style_name": "26NS27JPA849 - GRY CASTLE - R2",
@@ -2673,7 +2685,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-1103": {
       "style_name": "26NS27JPA954 - CORN BEIGE - R1",
@@ -2991,7 +3005,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-1184": {
       "style_name": "26NS27JPA849 - BLACK - R3",
@@ -3357,7 +3373,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-1185": {
       "style_name": "26NS27JPA849 - GRY CASTLE - R3",
@@ -3723,7 +3741,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-1295": {
       "style_name": "26NS27JPA849 - BLACK - R4",
@@ -4090,7 +4110,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-1279": {
       "style_name": "06W27DPL422 - MLTI STRPS",
@@ -4648,7 +4670,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-1285": {
       "style_name": "16NS27JPA950 - SKY CPTN - R1",
@@ -5014,7 +5038,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-1294": {
       "style_name": "26NS27JPA954 - CORN BEIGE - R2",
@@ -5332,7 +5358,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-1296": {
       "style_name": "26NS27JPA849 - GRY CASTLE - R4",
@@ -5698,7 +5726,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-1297": {
       "style_name": "26NS27JPA417 - GRN SMKOLV - R1",
@@ -6128,7 +6158,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-1298": {
       "style_name": "26NS27JPA417 - MLKY BRWN - R1",
@@ -6558,7 +6590,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-1299": {
       "style_name": "16NS25JPA219 - BLACK - R1",
@@ -7020,7 +7054,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-1337": {
       "style_name": "30NS27SET471 - ROSE PINK",
@@ -7612,7 +7648,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-1338": {
       "style_name": "30NS27SET696 - BRN STRIPE",
@@ -8204,7 +8242,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-458": {
       "style_name": "26NS27JPA909 - BGE RAINY - R3",
@@ -8570,7 +8610,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-740": {
       "style_name": "26S27SBO943 - BLACK - R4",
@@ -8920,7 +8962,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-744": {
       "style_name": "26S27SBO943 - BLU DINOS - R4",
@@ -9286,7 +9330,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-745": {
       "style_name": "26S27SBO943 - CORN BEIGE - R4",
@@ -9652,7 +9698,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-746": {
       "style_name": "26S27SBO943 - GRN LAUREL - R4",
@@ -10018,7 +10066,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-747": {
       "style_name": "16S27SBO388 - CORN BEIGE - R2",
@@ -10400,7 +10450,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-748": {
       "style_name": "16S27SBO388 - DRESS NAVY - R2",
@@ -10798,7 +10850,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-796": {
       "style_name": "16NS25JPA219 - BGE SAVNH",
@@ -11260,7 +11314,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-797": {
       "style_name": "16NS25JPA219 - BLACK",
@@ -11738,7 +11794,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-795": {
       "style_name": "16NS25JPA219 - BRN COFFEE",
@@ -12184,7 +12242,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     },
     "B-26-794": {
       "style_name": "16NS27JPA950 - SKY CPTN",
@@ -12550,7 +12610,9 @@
           "status": "Pending",
           "is_hidden": false
         }
-      ]
+      ],
+      "buyer_code": "C/20/1",
+      "buyer_name": "Kmart"
     }
   },
   "last_synced": "2026-11-24 11:59:53",
