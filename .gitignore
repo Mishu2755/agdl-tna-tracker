@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.xlsx
+*.pdf
+.env
+venv/
+env/
+Reference T&A Format/
