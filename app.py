@@ -192,19 +192,97 @@ HTML_TEMPLATE = """
                 </button>
             </div>
 
-            <!-- Specific Item Quick Filter (Fabric, Sewing Thread, Poly, Carton, etc.) -->
-            <div class="flex items-center space-x-2">
-                <span class="text-xs font-medium text-slate-500">Quick Item Filter:</span>
-                <select id="itemQuickFilter" onchange="filterSpecificItem(this.value)" class="text-xs font-medium bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
-                    <option value="">-- Show All Items --</option>
-                    {% for item in unique_items %}
-                    <option value="{{ item }}">{{ item }}</option>
-                    {% endfor %}
-                </select>
+            <!-- Searchable Multi-Select Filters (Styles & Items) -->
+            <div class="flex flex-wrap items-center gap-2">
+                <!-- Style Multi-Select Searchable Dropdown -->
+                <div class="relative" id="styleFilterDropdownWrap">
+                    <div class="flex items-center bg-slate-50 border border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 rounded-lg px-2 py-1 transition w-56 sm:w-64">
+                        <i class="fa-solid fa-shirt text-blue-500 text-[11px] mr-1.5 shrink-0"></i>
+                        <input type="text" id="styleSearchInput"
+                            placeholder="Filter Styles (e.g. 849, JPA)..."
+                            onfocus="openMultiDropdown('style')"
+                            oninput="onMultiSearchInput('style', this.value)"
+                            onkeydown="if(event.key==='Escape') closeAllMultiDropdowns()"
+                            autocomplete="off"
+                            class="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full">
+                        <span id="styleFilterCount" class="hidden ml-1 bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full shrink-0">0</span>
+                        <button type="button" id="styleFilterClearBtn" onclick="clearMultiFilter('style')" title="Clear Style Filter" class="hidden ml-1 text-slate-400 hover:text-red-500 text-xs px-1 shrink-0">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                        <button type="button" onclick="toggleMultiDropdown('style')" class="ml-0.5 text-slate-400 hover:text-slate-600 text-[10px] px-1 shrink-0" title="Show Style List">
+                            <i class="fa-solid fa-chevron-down"></i>
+                        </button>
+                    </div>
+                    <div id="styleDropdownPanel" class="hidden absolute right-0 sm:left-0 mt-1 w-72 sm:w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-40 overflow-hidden">
+                        <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 flex items-center justify-between text-[11px]">
+                            <span class="font-semibold text-slate-600">Select Styles (<span id="styleMatchCount">{{ style_options|length }}</span>)</span>
+                            <div class="space-x-2">
+                                <button type="button" onclick="selectAllMatchingMulti('style')" class="text-blue-600 hover:underline font-semibold">Select Matching</button>
+                                <button type="button" onclick="clearMultiFilter('style')" class="text-slate-500 hover:text-red-600 font-medium">Clear</button>
+                            </div>
+                        </div>
+                        <div id="styleDropdownList" class="max-h-64 overflow-y-auto custom-scroll divide-y divide-slate-100 p-1">
+                            {% for st in style_options %}
+                            <label class="multi-opt-style flex items-center space-x-2 px-2.5 py-1.5 rounded-lg hover:bg-blue-50/70 cursor-pointer text-xs text-slate-700" data-label="{{ st.name|lower }}">
+                                <input type="checkbox" value="{{ st.id }}" data-display="{{ st.name }}" onchange="onMultiCheckboxChange('style', this)" class="multi-cb-style rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 shrink-0">
+                                <span class="truncate font-medium" title="{{ st.name }}">{{ st.name }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Item Multi-Select Searchable Dropdown -->
+                <div class="relative" id="itemFilterDropdownWrap">
+                    <div class="flex items-center bg-slate-50 border border-slate-300 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 rounded-lg px-2 py-1 transition w-56 sm:w-64">
+                        <i class="fa-solid fa-tags text-emerald-600 text-[11px] mr-1.5 shrink-0"></i>
+                        <input type="text" id="itemSearchInput"
+                            placeholder="Filter Items (e.g. Label, Fabric)..."
+                            onfocus="openMultiDropdown('item')"
+                            oninput="onMultiSearchInput('item', this.value)"
+                            onkeydown="if(event.key==='Escape') closeAllMultiDropdowns()"
+                            autocomplete="off"
+                            class="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full">
+                        <span id="itemFilterCount" class="hidden ml-1 bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full shrink-0">0</span>
+                        <button type="button" id="itemFilterClearBtn" onclick="clearMultiFilter('item')" title="Clear Item Filter" class="hidden ml-1 text-slate-400 hover:text-red-500 text-xs px-1 shrink-0">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                        <button type="button" onclick="toggleMultiDropdown('item')" class="ml-0.5 text-slate-400 hover:text-slate-600 text-[10px] px-1 shrink-0" title="Show Item List">
+                            <i class="fa-solid fa-chevron-down"></i>
+                        </button>
+                    </div>
+                    <div id="itemDropdownPanel" class="hidden absolute right-0 mt-1 w-72 sm:w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-40 overflow-hidden">
+                        <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 flex items-center justify-between text-[11px]">
+                            <span class="font-semibold text-slate-600">Select Items (<span id="itemMatchCount">{{ unique_items|length }}</span>)</span>
+                            <div class="space-x-2">
+                                <button type="button" onclick="selectAllMatchingMulti('item')" class="text-emerald-600 hover:underline font-semibold">Select Matching</button>
+                                <button type="button" onclick="clearMultiFilter('item')" class="text-slate-500 hover:text-red-600 font-medium">Clear</button>
+                            </div>
+                        </div>
+                        <div id="itemDropdownList" class="max-h-64 overflow-y-auto custom-scroll divide-y divide-slate-100 p-1">
+                            {% for item in unique_items %}
+                            <label class="multi-opt-item flex items-center space-x-2 px-2.5 py-1.5 rounded-lg hover:bg-emerald-50/70 cursor-pointer text-xs text-slate-700" data-label="{{ item|lower }}">
+                                <input type="checkbox" value="{{ item|lower }}" data-display="{{ item }}" onchange="onMultiCheckboxChange('item', this)" class="multi-cb-item rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 shrink-0">
+                                <span class="truncate font-medium" title="{{ item }}">{{ item }}</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
                 <button onclick="expandAllStyles(true)" class="text-xs text-blue-600 hover:underline px-2 py-0.5 font-medium">Expand All</button>
                 <span class="text-slate-300">|</span>
                 <button onclick="expandAllStyles(false)" class="text-xs text-slate-500 hover:underline px-2 py-0.5 font-medium">Collapse All</button>
             </div>
+        </div>
+
+        <!-- Active Filter Chips Strip (Hidden when no multi-filter chips active) -->
+        <div id="activeFilterChipsBar" class="hidden bg-white px-3 py-2 rounded-xl border border-blue-200 flex flex-wrap items-center gap-1.5 w-full">
+            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mr-1">Active Filters:</span>
+            <div id="activeFilterChipsList" class="flex flex-wrap items-center gap-1.5"></div>
+            <button type="button" onclick="resetAllMultiFilters()" class="ml-auto text-[11px] text-red-600 hover:underline font-semibold px-2 py-0.5">
+                Reset All Filters
+            </button>
         </div>
 
         <!-- Styles & T&A Board (100% Full Width) -->
@@ -226,7 +304,7 @@ HTML_TEMPLATE = """
             {% endif %}
 
             {% for style_id, s in styles.items() %}
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden transition-all duration-200 style-card w-full" id="card_{{ style_id }}">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden transition-all duration-200 style-card w-full" id="card_{{ style_id }}" data-style-id="{{ style_id }}" data-style-name="{{ (s.style_name or style_id)|lower }}">
                 <!-- Accordion Header: Click to expand / collapse style -->
                 <div onclick="toggleStyleAccordion('{{ style_id }}')" class="bg-slate-50/95 hover:bg-slate-100/90 px-4 sm:px-6 py-3 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 cursor-pointer select-none transition">
                     <div class="flex items-center space-x-3">
@@ -307,6 +385,7 @@ HTML_TEMPLATE = """
                                 {% elif is_pending_action %}bg-amber-50/20 hover:bg-amber-50/50
                                 {% else %}hover:bg-slate-50/90{% endif %}" 
                                 id="row_{{ style_id }}_{{ t.id }}" 
+                                data-style-id="{{ style_id }}"
                                 data-category="{{ t.category }}" 
                                 data-item-name="{{ t.item_name|lower }}">
                                 <td class="py-2 px-2 align-top text-center pt-2.5">
@@ -601,36 +680,215 @@ HTML_TEMPLATE = """
             applyFilters();
         }
 
-        function filterSpecificItem(val) {
-            currentItemFilter = val.trim().toLowerCase();
+        let selectedStyles = new Map(); // styleId -> display label
+        let selectedItems = new Map();  // lower(itemName) -> display label
+
+        function getMultiState(kind) {
+            return {
+                map: kind === 'style' ? selectedStyles : selectedItems,
+                panel: document.getElementById(kind + 'DropdownPanel'),
+                input: document.getElementById(kind + 'SearchInput'),
+                badge: document.getElementById(kind + 'FilterCount'),
+                clearBtn: document.getElementById(kind + 'FilterClearBtn'),
+                matchCount: document.getElementById(kind + 'MatchCount'),
+                optSelector: '.multi-opt-' + kind,
+                cbSelector: '.multi-cb-' + kind
+            };
+        }
+
+        function openMultiDropdown(kind) {
+            closeAllMultiDropdowns(kind);
+            const st = getMultiState(kind);
+            if (st.panel) st.panel.classList.remove('hidden');
+            filterMultiOptions(kind, st.input ? st.input.value : '');
+        }
+
+        function toggleMultiDropdown(kind) {
+            const st = getMultiState(kind);
+            if (!st.panel) return;
+            if (st.panel.classList.contains('hidden')) {
+                openMultiDropdown(kind);
+                if (st.input) st.input.focus();
+            } else {
+                st.panel.classList.add('hidden');
+            }
+        }
+
+        function closeAllMultiDropdowns(exceptKind = null) {
+            ['style', 'item'].forEach(k => {
+                if (k !== exceptKind) {
+                    const p = document.getElementById(k + 'DropdownPanel');
+                    if (p) p.classList.add('hidden');
+                }
+            });
+        }
+
+        document.addEventListener('click', (e) => {
+            const styleWrap = document.getElementById('styleFilterDropdownWrap');
+            const itemWrap = document.getElementById('itemFilterDropdownWrap');
+            if (styleWrap && !styleWrap.contains(e.target)) {
+                document.getElementById('styleDropdownPanel')?.classList.add('hidden');
+            }
+            if (itemWrap && !itemWrap.contains(e.target)) {
+                document.getElementById('itemDropdownPanel')?.classList.add('hidden');
+            }
+        });
+
+        function filterMultiOptions(kind, query) {
+            const st = getMultiState(kind);
+            const q = (query || '').trim().toLowerCase();
+            let visible = 0;
+            document.querySelectorAll(st.optSelector).forEach(lbl => {
+                const text = lbl.getAttribute('data-label') || '';
+                if (!q || text.includes(q)) {
+                    lbl.style.display = '';
+                    visible++;
+                } else {
+                    lbl.style.display = 'none';
+                }
+            });
+            if (st.matchCount) st.matchCount.innerText = visible;
+        }
+
+        function onMultiSearchInput(kind, val) {
+            const st = getMultiState(kind);
+            if (st.panel) st.panel.classList.remove('hidden');
+            filterMultiOptions(kind, val);
+            updateMultiFilterUI(kind);
             applyFilters();
+        }
+
+        function onMultiCheckboxChange(kind, cb) {
+            const st = getMultiState(kind);
+            const val = cb.value;
+            const display = cb.getAttribute('data-display') || val;
+            if (cb.checked) {
+                st.map.set(val, display);
+            } else {
+                st.map.delete(val);
+            }
+            updateMultiFilterUI(kind);
+            applyFilters();
+        }
+
+        function selectAllMatchingMulti(kind) {
+            const st = getMultiState(kind);
+            document.querySelectorAll(st.optSelector).forEach(lbl => {
+                if (lbl.style.display !== 'none') {
+                    const cb = lbl.querySelector(st.cbSelector);
+                    if (cb) {
+                        cb.checked = true;
+                        st.map.set(cb.value, cb.getAttribute('data-display') || cb.value);
+                    }
+                }
+            });
+            updateMultiFilterUI(kind);
+            applyFilters();
+        }
+
+        function clearMultiFilter(kind) {
+            const st = getMultiState(kind);
+            st.map.clear();
+            if (st.input) st.input.value = '';
+            document.querySelectorAll(st.cbSelector).forEach(cb => cb.checked = false);
+            filterMultiOptions(kind, '');
+            updateMultiFilterUI(kind);
+            applyFilters();
+        }
+
+        function resetAllMultiFilters() {
+            clearMultiFilter('style');
+            clearMultiFilter('item');
+        }
+
+        function updateMultiFilterUI(kind) {
+            const st = getMultiState(kind);
+            const count = st.map.size;
+            const hasText = !!(st.input && st.input.value.trim() !== '');
+            if (st.badge) {
+                if (count > 0) {
+                    st.badge.innerText = count;
+                    st.badge.classList.remove('hidden');
+                } else {
+                    st.badge.classList.add('hidden');
+                }
+            }
+            if (st.clearBtn) {
+                if (count > 0 || hasText) st.clearBtn.classList.remove('hidden');
+                else st.clearBtn.classList.add('hidden');
+            }
+            renderActiveFilterChips();
+        }
+
+        function renderActiveFilterChips() {
+            const bar = document.getElementById('activeFilterChipsBar');
+            const list = document.getElementById('activeFilterChipsList');
+            if (!bar || !list) return;
+            list.innerHTML = '';
+
+            const addChip = (kind, key, label, colorClasses) => {
+                const span = document.createElement('span');
+                span.className = `inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${colorClasses}`;
+                const txt = document.createElement('span');
+                txt.textContent = (kind === 'style' ? 'Style: ' : 'Item: ') + label;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'hover:text-red-600 focus:outline-none ml-1';
+                btn.innerHTML = '<i class="fa-solid fa-xmark text-[10px]"></i>';
+                btn.addEventListener('click', () => {
+                    const st = getMultiState(kind);
+                    st.map.delete(key);
+                    document.querySelectorAll(st.cbSelector).forEach(cb => {
+                        if (cb.value === key) cb.checked = false;
+                    });
+                    updateMultiFilterUI(kind);
+                    applyFilters();
+                });
+                span.appendChild(txt);
+                span.appendChild(btn);
+                list.appendChild(span);
+            };
+
+            selectedStyles.forEach((label, key) => addChip('style', key, label, 'bg-blue-50 text-blue-800 border-blue-200'));
+            selectedItems.forEach((label, key) => addChip('item', key, label, 'bg-emerald-50 text-emerald-800 border-emerald-200'));
+
+            if (selectedStyles.size > 0 || selectedItems.size > 0) {
+                bar.classList.remove('hidden');
+            } else {
+                bar.classList.add('hidden');
+            }
         }
 
         function applyFilters() {
             const hideCompleted = document.getElementById('hideCompletedCheck').checked;
-            const rows = document.querySelectorAll('.task-row');
+            const styleQuery = (document.getElementById('styleSearchInput')?.value || '').trim().toLowerCase();
+            const itemQuery = (document.getElementById('itemSearchInput')?.value || '').trim().toLowerCase();
+            const isFilteringStyle = (selectedStyles.size > 0 || styleQuery !== '');
+            const isFilteringItem = (selectedItems.size > 0 || itemQuery !== '');
 
-            // Track which style cards have at least one visible row
+            const rows = document.querySelectorAll('.task-row');
             const visibleCountByStyle = {};
 
             rows.forEach(r => {
                 const cat = r.getAttribute('data-category');
-                const itemName = r.getAttribute('data-item-name');
+                const itemName = (r.getAttribute('data-item-name') || '').toLowerCase();
                 const isClosed = r.classList.contains('is-closed-task');
 
                 let matchCat = (currentCategoryFilter === 'all' || cat === currentCategoryFilter);
-                let matchItem = (!currentItemFilter || itemName.includes(currentItemFilter));
-                let matchClosed = (!hideCompleted || !isClosed);
+                let matchItem = true;
+                if (selectedItems.size > 0) {
+                    matchItem = selectedItems.has(itemName);
+                } else if (itemQuery !== '') {
+                    matchItem = itemName.includes(itemQuery);
+                }
 
-                // When filtering by a specific item, never show already closed/completed rows for that item
-                if (currentItemFilter && isClosed) {
+                let matchClosed = (!hideCompleted || !isClosed);
+                // When filtering by specific item(s), never show already closed/completed rows for that item
+                if (isFilteringItem && isClosed) {
                     matchClosed = false;
                 }
 
-                // Get style card id from row id: row_<styleId>_<taskId>
-                const rowId = r.id || "";
-                const parts = rowId.split("_");
-                const styleId = parts.length >= 2 ? parts[1] : null;
+                const styleId = r.getAttribute('data-style-id');
 
                 if (matchCat && matchItem && matchClosed) {
                     r.style.display = '';
@@ -642,16 +900,24 @@ HTML_TEMPLATE = """
                 }
             });
 
-            // Hide or show style cards based on whether they have visible matching items
+            // Hide or show style cards based on Style Filter AND visible matching items
             document.querySelectorAll('.style-card').forEach(card => {
-                const cardId = card.id || "";
-                const styleId = cardId.replace("card_", "");
-                const count = visibleCountByStyle[styleId] || 0;
+                const styleId = card.getAttribute('data-style-id') || card.id.replace('card_', '');
+                const styleName = (card.getAttribute('data-style-name') || '').toLowerCase();
 
-                if (count > 0 || (!currentItemFilter && currentCategoryFilter === 'all' && !hideCompleted)) {
+                let matchStyle = true;
+                if (selectedStyles.size > 0) {
+                    matchStyle = selectedStyles.has(styleId);
+                } else if (styleQuery !== '') {
+                    matchStyle = styleName.includes(styleQuery);
+                }
+
+                const count = visibleCountByStyle[styleId] || 0;
+                const hasVisibleContent = (count > 0 || (!isFilteringItem && currentCategoryFilter === 'all' && !hideCompleted));
+
+                if (matchStyle && hasVisibleContent) {
                     card.style.display = '';
-                    // If filtering by specific item, auto-expand the card so user sees it right away
-                    if (currentItemFilter) {
+                    if (isFilteringItem || isFilteringStyle) {
                         const body = document.getElementById(`body_${styleId}`);
                         const arrow = document.getElementById(`arrow_${styleId}`);
                         if (body) {
@@ -857,19 +1123,26 @@ HTML_TEMPLATE = """
             updateSelectedCount();
         }
 
+        function isRowActuallyVisible(row) {
+            if (!row || row.style.display === 'none') return false;
+            const card = row.closest('.style-card');
+            if (card && card.style.display === 'none') return false;
+            return true;
+        }
+
         function toggleSelectAllVisible() {
-            const visibleRows = document.querySelectorAll('.task-row');
+            const allRows = document.querySelectorAll('.task-row');
             let anyUnchecked = false;
-            visibleRows.forEach(row => {
-                if (row.style.display !== 'none') {
+            allRows.forEach(row => {
+                if (isRowActuallyVisible(row)) {
                     const cb = row.querySelector('.task-select-cb');
                     if (cb && !cb.checked) anyUnchecked = true;
                 }
             });
 
             const setChecked = anyUnchecked;
-            visibleRows.forEach(row => {
-                if (row.style.display !== 'none') {
+            allRows.forEach(row => {
+                if (isRowActuallyVisible(row)) {
                     const cb = row.querySelector('.task-select-cb');
                     if (cb) {
                         cb.checked = setChecked;
@@ -879,7 +1152,12 @@ HTML_TEMPLATE = """
                     }
                 }
             });
-            document.querySelectorAll('.style-select-all').forEach(sa => sa.checked = setChecked);
+            document.querySelectorAll('.style-card').forEach(card => {
+                if (card.style.display !== 'none') {
+                    const sa = card.querySelector('.style-select-all');
+                    if (sa) sa.checked = setChecked;
+                }
+            });
             updateSelectedCount();
             showToast(setChecked ? "Selected all visible items" : "Deselected all items");
         }
@@ -1115,22 +1393,26 @@ def index():
 
     styles = storage.get_styles_by_buyer(current_buyer.get("code"))
 
-    items_set = set()
+    items_map = {}
+    style_options = []
     total_styles = len(styles)
     pending_count = 0
     closed_count = 0
 
-    for s in styles.values():
+    for sid, s in styles.items():
+        s_name = (s.get("style_name") or sid).strip()
+        style_options.append({"id": sid, "name": s_name})
         for t in s.get("tasks", []):
-            item_name = t.get("item_name")
+            item_name = (t.get("item_name") or "").strip()
             if item_name:
-                items_set.add(item_name)
+                items_map.setdefault(item_name.lower(), item_name)
             if is_task_completed(t):
                 closed_count += 1
             else:
                 pending_count += 1
 
-    unique_items = sorted(list(items_set))
+    unique_items = sorted(items_map.values(), key=lambda x: x.lower())
+    style_options.sort(key=lambda x: x["name"].lower())
 
     return render_template_string(
         HTML_TEMPLATE,
@@ -1140,7 +1422,8 @@ def index():
         total_styles=total_styles,
         pending_count=pending_count,
         closed_count=closed_count,
-        unique_items=unique_items
+        unique_items=unique_items,
+        style_options=style_options
     )
 
 @app.route("/api/set-buyer", methods=["POST"])
