@@ -915,10 +915,6 @@ HTML_TEMPLATE = """
                 }
 
                 let matchClosed = (!hideCompleted || !isClosed);
-                // When filtering by specific item(s), never show already closed/completed rows for that item
-                if (isFilteringItem && isClosed) {
-                    matchClosed = false;
-                }
 
                 const styleId = r.getAttribute('data-style-id');
 
