@@ -1172,46 +1172,54 @@ def stream_check_add_new_styles():
             yield f"data: {json.dumps({'percent': 100, 'message': f'No new running styles found for {buyer_name}.', 'done': True})}\n\n"
             return
 
-        added_count = 0
+        new_entries = []
         for idx, st in enumerate(erp_styles, 1):
             costing_id = st.get("costing_id")
             s_name = st.get("style_name")
-            pct = 15 + int((idx / total) * 80)
-            yield f"data: {json.dumps({'percent': pct, 'message': f'Processing [{idx}/{total}]: {s_name}...', 'done': False})}\n\n"
+            pct = 15 + int((idx / total) * 75)
+            yield f"data: {json.dumps({'percent': pct, 'message': f'Checking [{idx}/{total}]: {s_name}...', 'done': False})}\n\n"
 
             if not costing_id or costing_id in existing_styles:
                 continue
 
-            ocb_details = erp.get_style_ocb_details(st["ocb_id"]) if st.get("ocb_id") else {}
-            garment_qty = ocb_details.get("OrderQty") or 0
-            fob = ocb_details.get("FOB") or ""
+            try:
+                ocb_details = erp.get_style_ocb_details(st["ocb_id"]) if st.get("ocb_id") else {}
+                ocb_details = ocb_details or {}
+                garment_qty = ocb_details.get("OrderQty") or 0
+                fob = ocb_details.get("FOB") or ""
 
-            costing_items = erp.get_costing_items(costing_id)
-            bom_items = erp.get_bom_inhoused_status(costing_id)
+                costing_items = erp.get_costing_items(costing_id)
+                bom_items = erp.get_bom_inhoused_status(costing_id)
 
-            tasks = generate_style_tasks(costing_items, bom_items, garment_qty=garment_qty)
+                tasks = generate_style_tasks(costing_items, bom_items, garment_qty=garment_qty)
 
-            storage.upsert_style(costing_id, {
-                "style_name": s_name,
-                "costing_id": costing_id,
-                "buyer_code": buyer["code"],
-                "buyer_name": buyer["name"],
-                "ocb_id": st.get("ocb_id"),
-                "garment_qty": garment_qty,
-                "garment_type": st.get("garment_type"),
-                "oc_date": st.get("oc_date"),
-                "first_ffd": st.get("first_ffd"),
-                "last_ffd": st.get("last_ffd"),
-                "first_tna_date": st.get("first_tna_date"),
-                "fob": fob,
-                "tasks": tasks
-            })
-            added_count += 1
+                new_entries.append((costing_id, {
+                    "style_name": s_name,
+                    "costing_id": costing_id,
+                    "buyer_code": buyer["code"],
+                    "buyer_name": buyer["name"],
+                    "ocb_id": st.get("ocb_id"),
+                    "garment_qty": garment_qty,
+                    "garment_type": st.get("garment_type"),
+                    "oc_date": st.get("oc_date"),
+                    "first_ffd": st.get("first_ffd"),
+                    "last_ffd": st.get("last_ffd"),
+                    "first_tna_date": st.get("first_tna_date"),
+                    "fob": fob,
+                    "tasks": tasks
+                }))
+            except Exception as e:
+                app.logger.warning(f"Error processing new style {s_name} ({costing_id}): {e}")
 
-        storage.set_last_synced()
-        yield f"data: {json.dumps({'percent': 100, 'message': f'Completed! Added {added_count} running style(s) for {buyer_name}.', 'done': True})}\n\n"
+        if new_entries:
+            yield f"data: {json.dumps({'percent': 95, 'message': f'Saving {len(new_entries)} new style(s) to database...', 'done': False})}\n\n"
+            storage.upsert_styles_batch(new_entries)
+        else:
+            storage.set_last_synced()
 
-    return Response(generate(), mimetype="text/event-stream")
+        yield f"data: {json.dumps({'percent': 100, 'message': f'Completed! Added {len(new_entries)} running style(s) for {buyer_name}.', 'done': True})}\n\n"
+
+    return Response(generate(), mimetype="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 @app.route("/api/stream/sync-inhoused")
 def stream_sync_inhoused():
@@ -1227,51 +1235,25 @@ def stream_sync_inhoused():
             yield f"data: {json.dumps({'percent': 100, 'message': 'No styles in chart to sync.', 'done': True})}\n\n"
             return
 
-        updated_items = 0
+        bom_results = {}
         for idx, cid in enumerate(costing_ids, 1):
             s_info = styles[cid]
             s_name = s_info.get("style_name") or cid
-            pct = int((idx / total) * 95)
+            pct = 5 + int((idx / total) * 85)
             yield f"data: {json.dumps({'percent': pct, 'message': f'Syncing [{idx}/{total}]: {s_name}...', 'done': False})}\n\n"
 
-            bom_items = erp.get_bom_inhoused_status(cid)
-            if not bom_items:
-                continue
+            try:
+                bom_items = erp.get_bom_inhoused_status(cid)
+                if bom_items:
+                    bom_results[cid] = bom_items
+            except Exception as e:
+                app.logger.warning(f"Error syncing BOM for {cid} ({s_name}): {e}")
 
-            bom_map = {b["item_name"].lower(): b for b in bom_items}
-            tasks = s_info.get("tasks", [])
+        yield f"data: {json.dumps({'percent': 95, 'message': 'Saving refreshed quantities to database...', 'done': False})}\n\n"
+        updated_items = storage.apply_bom_updates_batch(bom_results, sort_tasks)
+        yield f"data: {json.dumps({'percent': 100, 'message': f'Sync complete! Refreshed {updated_items} item quantities across {total} style(s).', 'done': True})}\n\n"
 
-            for t in tasks:
-                if not t.get("is_costing"):
-                    continue
-                t_name = t.get("item_name", "").lower()
-                matched = bom_map.get(t_name)
-                if not matched:
-                    for b_name, b_val in bom_map.items():
-                        if b_name in t_name or t_name in b_name:
-                            matched = b_val
-                            break
-
-                if matched:
-                    t["booked_qty"] = matched["booked_qty"]
-                    t["ih_qty"] = matched["ih_qty"]
-                    t["bal_qty"] = matched["bal_qty"]
-                    t["uom"] = matched["uom"] or t.get("uom")
-
-                    if matched["booked_qty"] > 0 and matched["bal_qty"] <= 0 and matched["ih_qty"] > 0:
-                        t["status"] = "Closed"
-                        t["updates"] = f"Fully Inhoused ({matched['ih_qty']:g} {t['uom']})"
-                    elif matched["ih_qty"] > 0:
-                        t["updates"] = f"{matched['booked_qty']:g} {t['uom']} Booked, {matched['ih_qty']:g} {t['uom']} Inhoused, Balance to i/h {matched['bal_qty']:g} {t['uom']}"
-                    updated_items += 1
-
-            s_info["tasks"] = sort_tasks(tasks)
-            storage.upsert_style(cid, s_info)
-
-        storage.set_last_synced()
-        yield f"data: {json.dumps({'percent': 100, 'message': f'Sync complete! Refreshed {updated_items} item quantities.', 'done': True})}\n\n"
-
-    return Response(generate(), mimetype="text/event-stream")
+    return Response(generate(), mimetype="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 @app.route("/api/update-task", methods=["POST"])
 def update_task_field():

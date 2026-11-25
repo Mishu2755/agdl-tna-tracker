@@ -22,6 +22,7 @@ class TNAStorage:
         self.db_url = os.environ.get("DATABASE_URL", "").strip()
         self.use_db = bool(self.db_url and HAS_PSYCOPG2)
         self.lock = threading.Lock()
+        self._local = threading.local()
         self._last_mtime = 0.0
         self._last_db_updated_at = None
         self.data: Dict[str, Any] = {
@@ -35,11 +36,46 @@ class TNAStorage:
         self.load()
 
     def _get_conn(self):
-        return psycopg2.connect(self.db_url, connect_timeout=15)
+        conn = getattr(self._local, "conn", None)
+        if conn is not None and not conn.closed:
+            return conn
+        conn = psycopg2.connect(self.db_url, connect_timeout=15)
+        self._local.conn = conn
+        return conn
+
+    def _reset_conn(self):
+        conn = getattr(self._local, "conn", None)
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            self._local.conn = None
+
+    def _run_db(self, fn):
+        """Runs a DB callback with thread-local connection reuse and 1 auto-reconnect retry."""
+        for attempt in range(2):
+            conn = None
+            try:
+                conn = self._get_conn()
+                res = fn(conn)
+                conn.commit()
+                return res
+            except Exception as e:
+                if conn is not None:
+                    try:
+                        conn.rollback()
+                    except Exception:
+                        pass
+                self._reset_conn()
+                if attempt == 0:
+                    logger.debug(f"DB retry after transient error: {e}")
+                    continue
+                raise
 
     def _init_db(self):
         try:
-            with self._get_conn() as conn:
+            def _create(conn):
                 with conn.cursor() as cur:
                     cur.execute("""
                         CREATE TABLE IF NOT EXISTS tna_store (
@@ -48,7 +84,7 @@ class TNAStorage:
                             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                         );
                     """)
-                conn.commit()
+            self._run_db(_create)
             logger.info("Connected to PostgreSQL persistent database (tna_store ready).")
         except Exception as e:
             logger.error(f"PostgreSQL init failed, falling back to local JSON: {e}")
@@ -58,12 +94,13 @@ class TNAStorage:
         """Checks if file on disk or PostgreSQL row has changed and reloads to keep multi-user concurrent edits fresh."""
         if self.use_db:
             try:
-                with self._get_conn() as conn:
+                def _check(conn):
                     with conn.cursor() as cur:
                         cur.execute("SELECT updated_at FROM tna_store WHERE id = 'main'")
-                        row = cur.fetchone()
-                        if row and row[0] != self._last_db_updated_at:
-                            self.load()
+                        return cur.fetchone()
+                row = self._run_db(_check)
+                if row and row[0] != self._last_db_updated_at:
+                    self.load()
             except Exception as e:
                 logger.debug(f"DB mtime check error: {e}")
             return
@@ -80,31 +117,30 @@ class TNAStorage:
         with self.lock:
             if self.use_db:
                 try:
-                    with self._get_conn() as conn:
+                    def _load_or_seed(conn):
                         with conn.cursor() as cur:
                             cur.execute("SELECT data, updated_at FROM tna_store WHERE id = 'main'")
                             row = cur.fetchone()
                             if row:
-                                self.data = row[0] if isinstance(row[0], dict) else json.loads(row[0])
-                                self._last_db_updated_at = row[1]
-                                logger.info(f"Loaded T&A data from PostgreSQL: {len(self.data.get('styles', {}))} styles.")
-                                return
-                            else:
-                                # Seed DB from local tna_data.json if present
-                                if self.filepath.exists():
-                                    with open(self.filepath, "r", encoding="utf-8") as f:
-                                        self.data = json.load(f)
-                                    logger.info(f"Seeding PostgreSQL from local JSON ({len(self.data.get('styles', {}))} styles)...")
-                                cur.execute(
-                                    "INSERT INTO tna_store (id, data, updated_at) VALUES ('main', %s, CURRENT_TIMESTAMP)",
-                                    (Json(self.data),)
-                                )
-                                conn.commit()
-                                cur.execute("SELECT updated_at FROM tna_store WHERE id = 'main'")
-                                r2 = cur.fetchone()
-                                if r2:
-                                    self._last_db_updated_at = r2[0]
-                                return
+                                return ("loaded", row[0], row[1])
+                            seed_data = self.data
+                            if self.filepath.exists():
+                                with open(self.filepath, "r", encoding="utf-8") as f:
+                                    seed_data = json.load(f)
+                                logger.info(f"Seeding PostgreSQL from local JSON ({len(seed_data.get('styles', {}))} styles)...")
+                            cur.execute(
+                                "INSERT INTO tna_store (id, data, updated_at) VALUES ('main', %s, CURRENT_TIMESTAMP) RETURNING updated_at",
+                                (Json(seed_data),)
+                            )
+                            r2 = cur.fetchone()
+                            return ("seeded", seed_data, r2[0] if r2 else None)
+
+                    status, payload, ts = self._run_db(_load_or_seed)
+                    self.data = payload if isinstance(payload, dict) else json.loads(payload)
+                    self._last_db_updated_at = ts
+                    if status == "loaded":
+                        logger.info(f"Loaded T&A data from PostgreSQL: {len(self.data.get('styles', {}))} styles.")
+                    return
                 except Exception as e:
                     logger.error(f"Error loading from PostgreSQL: {e}")
 
@@ -122,7 +158,7 @@ class TNAStorage:
     def _save_unlocked(self):
         if self.use_db:
             try:
-                with self._get_conn() as conn:
+                def _upsert(conn):
                     with conn.cursor() as cur:
                         cur.execute(
                             """
@@ -134,10 +170,10 @@ class TNAStorage:
                             """,
                             (Json(self.data),)
                         )
-                        row = cur.fetchone()
-                        if row:
-                            self._last_db_updated_at = row[0]
-                    conn.commit()
+                        return cur.fetchone()
+                row = self._run_db(_upsert)
+                if row:
+                    self._last_db_updated_at = row[0]
             except Exception as e:
                 logger.error(f"Error saving to PostgreSQL: {e}")
 
@@ -186,6 +222,70 @@ class TNAStorage:
         else:
             self.data["styles"][costing_id] = style_info
         self.save()
+
+    def upsert_styles_batch(self, style_entries: List[tuple]):
+        """Batch inserts/updates multiple styles in a single atomic save."""
+        if not style_entries:
+            return
+        self._reload_if_needed()
+        if "styles" not in self.data:
+            self.data["styles"] = {}
+        for costing_id, style_info in style_entries:
+            if costing_id in self.data["styles"]:
+                existing = self.data["styles"][costing_id]
+                for k, v in style_info.items():
+                    if k != "tasks":
+                        existing[k] = v
+            else:
+                self.data["styles"][costing_id] = style_info
+        self.data["last_synced"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.save()
+
+    def apply_bom_updates_batch(self, bom_results: Dict[str, List[Dict[str, Any]]], sort_fn) -> int:
+        """Merges ERP BOM quantities across many styles into the latest DB state in a single save."""
+        self._reload_if_needed()
+        styles = self.data.get("styles", {})
+        updated_items = 0
+        now_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+        for cid, bom_items in bom_results.items():
+            if not bom_items or cid not in styles:
+                continue
+            s_info = styles[cid]
+            bom_map = {str(b.get("item_name", "")).lower(): b for b in bom_items if b.get("item_name")}
+            tasks = s_info.get("tasks", [])
+
+            for t in tasks:
+                if not t.get("is_costing"):
+                    continue
+                t_name = str(t.get("item_name", "")).lower()
+                matched = bom_map.get(t_name)
+                if not matched:
+                    for b_name, b_val in bom_map.items():
+                        if b_name in t_name or t_name in b_name:
+                            matched = b_val
+                            break
+
+                if matched:
+                    uom = matched.get("uom") or t.get("uom") or ""
+                    t["booked_qty"] = matched["booked_qty"]
+                    t["ih_qty"] = matched["ih_qty"]
+                    t["bal_qty"] = matched["bal_qty"]
+                    t["uom"] = uom
+
+                    if matched["booked_qty"] > 0 and matched["bal_qty"] <= 0 and matched["ih_qty"] > 0:
+                        t["status"] = "Closed"
+                        t["updates"] = f"Fully Inhoused ({matched['ih_qty']:g} {uom})".strip()
+                    elif matched["ih_qty"] > 0:
+                        t["updates"] = f"{matched['booked_qty']:g} {uom} Booked, {matched['ih_qty']:g} {uom} Inhoused, Balance to i/h {matched['bal_qty']:g} {uom}"
+                    t["last_modified"] = now_str
+                    updated_items += 1
+
+            s_info["tasks"] = sort_fn(tasks)
+
+        self.data["last_synced"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.save()
+        return updated_items
 
     def delete_style(self, costing_id: str):
         self._reload_if_needed()

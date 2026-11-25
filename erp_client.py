@@ -57,39 +57,59 @@ class ERPClient:
             return self.login()
         return True
 
+    def _request_json(self, method: str, url: str, timeout: int = 15, **kwargs) -> Any:
+        """Executes HTTP request expecting JSON; re-authenticates once if ASP.NET session expired."""
+        if not self.ensure_login():
+            return None
+        for attempt in range(2):
+            try:
+                if method.upper() == "POST":
+                    resp = self.session.post(url, timeout=timeout, **kwargs)
+                else:
+                    resp = self.session.get(url, timeout=timeout, **kwargs)
+
+                if resp.status_code == 200:
+                    txt = resp.text.lstrip()
+                    if txt.startswith("<"):
+                        # ASP.NET redirected to HTML login page due to expired session
+                        logger.warning(f"ERP session expired while fetching {url}; re-logging in...")
+                        self.is_authenticated = False
+                        if attempt == 0 and self.login():
+                            continue
+                        return None
+                    return resp.json()
+                elif resp.status_code in (401, 403) and attempt == 0:
+                    self.is_authenticated = False
+                    if self.login():
+                        continue
+            except Exception as e:
+                logger.error(f"ERP request error ({url}, attempt {attempt+1}): {e}")
+                if attempt == 0:
+                    self.is_authenticated = False
+                    self.login()
+        return None
+
     def get_buyers(self) -> List[Dict[str, str]]:
         """Fetch all buyers from ERP."""
-        if not self.ensure_login():
+        url = f"{self.base_url}/MarchantModule/FinalCosting/LoadBuyer"
+        buyers = self._request_json("GET", url, timeout=15)
+        if not isinstance(buyers, list):
             return []
-        try:
-            url = f"{self.base_url}/MarchantModule/FinalCosting/LoadBuyer"
-            resp = self.session.get(url, timeout=15)
-            if resp.status_code == 200:
-                buyers = resp.json()
-                result = []
-                for b in buyers:
-                    code = b.get("Code")
-                    name = b.get("Value")
-                    if code and name and code != "-1":
-                        result.append({"code": code, "name": name})
-                return result
-        except Exception as e:
-            logger.error(f"Error fetching buyers: {e}")
-        return []
+        result = []
+        for b in buyers:
+            code = b.get("Code")
+            name = b.get("Value")
+            if code and name and code != "-1":
+                result.append({"code": code, "name": name})
+        return result
 
     def get_running_bom_dict(self) -> Dict[str, str]:
         """Fetch all running styles across ERP BOM."""
-        if not self.ensure_login():
-            return {}
-        try:
-            bom_url = f"{self.base_url}/Procurement/BOM/LoadBOMStyle"
-            resp = self.session.get(bom_url, params={"keyword": "Running"}, timeout=15)
-            if resp.status_code == 200:
-                data = resp.json()
-                self._running_cache = {item["Code"]: item.get("Value", "") for item in data}
-                return self._running_cache
-        except Exception as e:
-            logger.error(f"Error fetching running BOM styles: {e}")
+        bom_url = f"{self.base_url}/Procurement/BOM/LoadBOMStyle"
+        data = self._request_json("GET", bom_url, params={"keyword": "Running"}, timeout=15)
+        if isinstance(data, list):
+            self._running_cache = {item["Code"]: item.get("Value", "") for item in data}
+            return self._running_cache
         return {}
 
     def get_style_capacity_schedule(self, ocb_id: str) -> Dict[str, Any]:
@@ -112,16 +132,16 @@ class ERPClient:
             "total_ship_qty": 0
         }
 
-        if not self.ensure_login() or not ocb_id:
+        if not ocb_id:
             return default_res
 
         try:
             url = f"{self.base_url}/Report/GetCapacityData"
-            resp = self.session.get(url, params={"OCBID": ocb_id}, timeout=12)
-            if resp.status_code != 200:
+            raw = self._request_json("GET", url, params={"OCBID": ocb_id}, timeout=12)
+            if not isinstance(raw, dict):
                 return default_res
 
-            d = resp.json().get("data", {})
+            d = raw.get("data", {})
             hdr = d.get("header", {})
             pos = d.get("poList", [])
 
@@ -207,12 +227,11 @@ class ERPClient:
 
             url = f"{self.base_url}/MarchantModule/FinalCosting/LoadStyle"
             headers = {"Content-Type": "application/json; charset=utf-8"}
-            resp = self.session.post(url, data=json.dumps({"ContactID": buyer_code}), headers=headers, timeout=20)
-            if resp.status_code != 200:
+            raw_styles = self._request_json("POST", url, data=json.dumps({"ContactID": buyer_code}), headers=headers, timeout=20)
+            if not isinstance(raw_styles, list):
                 logger.error(f"Failed to fetch styles for buyer {buyer_code}")
                 return []
 
-            raw_styles = resp.json()
             results = []
             
             for st in raw_styles:
@@ -266,61 +285,44 @@ class ERPClient:
 
     def get_style_ocb_details(self, ocb_id: str) -> Optional[Dict[str, Any]]:
         """Fetch OCB details (OrderQty, CostingID, StyleName, FOB, etc.)"""
-        if not self.ensure_login():
-            return None
-        try:
-            url = f"{self.base_url}/MarchantModule/FinalCosting/LoadOCB"
-            headers = {"Content-Type": "application/json; charset=utf-8"}
-            resp = self.session.post(url, data=json.dumps({"OCBID": ocb_id}), headers=headers, timeout=15)
-            if resp.status_code == 200:
-                data = resp.json()
-                if data and len(data) > 0:
-                    return data[0]
-        except Exception as e:
-            logger.error(f"Error getting OCB details for {ocb_id}: {e}")
+        url = f"{self.base_url}/MarchantModule/FinalCosting/LoadOCB"
+        headers = {"Content-Type": "application/json; charset=utf-8"}
+        data = self._request_json("POST", url, data=json.dumps({"OCBID": ocb_id}), headers=headers, timeout=15)
+        if isinstance(data, list) and len(data) > 0:
+            return data[0]
         return None
 
     def get_costing_items(self, costing_id: str) -> List[Dict[str, Any]]:
         """Fetch style-wise costing items list from Final Costing details."""
-        if not self.ensure_login():
-            return []
-        try:
-            url = f"{self.base_url}/MarchantModule/FinalCosting/LoadCostingDetails"
-            resp = self.session.get(url, params={"CostingID": costing_id}, timeout=15)
-            if resp.status_code == 200:
-                return resp.json()
-        except Exception as e:
-            logger.error(f"Error loading costing details for {costing_id}: {e}")
-        return []
+        url = f"{self.base_url}/MarchantModule/FinalCosting/LoadCostingDetails"
+        data = self._request_json("GET", url, params={"CostingID": costing_id}, timeout=15)
+        return data if isinstance(data, list) else []
 
     def get_bom_inhoused_status(self, costing_id: str) -> List[Dict[str, Any]]:
         """
         Check in-house status from ERP BOM:
         Returns items with BookedQty, RcvQty (Inhoused), and BalanceQty.
         """
-        if not self.ensure_login():
+        url = f"{self.base_url}/Procurement/BOM/GetCostingValueVsBookedValue"
+        data = self._request_json("GET", url, params={"FinalCostingID": costing_id}, timeout=20)
+        if not isinstance(data, list):
             return []
-        try:
-            url = f"{self.base_url}/Procurement/BOM/GetCostingValueVsBookedValue"
-            resp = self.session.get(url, params={"FinalCostingID": costing_id}, timeout=15)
-            if resp.status_code == 200:
-                data = resp.json()
-                results = []
-                for itm in data:
-                    item_name = itm.get("ItemGroupName") or itm.get("Items") or ""
-                    booked = float(itm.get("BookedQty") or 0)
-                    rcv = float(itm.get("RcvQty") or 0) # Inhoused
-                    balance = booked - rcv if booked > 0 else 0
-                    results.append({
-                        "item_name": item_name.strip(),
-                        "uom": itm.get("UOM") or "",
-                        "booked_qty": booked,
-                        "ih_qty": rcv,
-                        "bal_qty": balance,
-                        "total_cost": float(itm.get("TOTALCOST") or 0),
-                        "is_inhoused": (booked > 0 and balance <= 0)
-                    })
-                return results
-        except Exception as e:
-            logger.error(f"Error getting BOM inhoused status for {costing_id}: {e}")
-        return []
+        results = []
+        for itm in data:
+            try:
+                item_name = itm.get("ItemGroupName") or itm.get("Items") or ""
+                booked = float(itm.get("BookedQty") or 0)
+                rcv = float(itm.get("RcvQty") or 0) # Inhoused
+                balance = booked - rcv if booked > 0 else 0
+                results.append({
+                    "item_name": str(item_name).strip(),
+                    "uom": itm.get("UOM") or "",
+                    "booked_qty": booked,
+                    "ih_qty": rcv,
+                    "bal_qty": balance,
+                    "total_cost": float(itm.get("TOTALCOST") or 0),
+                    "is_inhoused": (booked > 0 and balance <= 0)
+                })
+            except Exception as e:
+                logger.warning(f"Skipping malformed BOM item in {costing_id}: {e}")
+        return results
