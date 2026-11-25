@@ -44,7 +44,7 @@ HTML_TEMPLATE = """
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col w-full">
 
     <!-- Top Navigation Bar (Full Width Edge-to-Edge) -->
-    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50 w-full">
+    <header id="topHeader" class="bg-slate-900 text-white shadow-md sticky top-0 z-50 w-full">
         <div class="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center space-x-3">
                 <div class="w-10 h-10 rounded-xl bg-blue-600 flex items-center justify-center font-bold text-xl shadow-inner tracking-wider">
@@ -154,135 +154,156 @@ HTML_TEMPLATE = """
             </div>
         </div>
 
-        <!-- Mode Toggle & Filter Bar: Style-Wise vs Item/Category Batch Update -->
-        <div class="bg-white p-3 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-3 w-full">
-            <div class="flex flex-wrap items-center gap-1.5">
-                <span class="text-xs font-bold text-slate-700 uppercase tracking-wide mr-1">
-                    <i class="fa-solid fa-sliders text-blue-600 mr-1"></i> Update Mode:
-                </span>
-                <button onclick="setFilterMode('all')" id="btnFilterAll" class="filter-tab px-3 py-1 rounded-lg text-xs font-semibold bg-blue-600 text-white shadow-sm transition">
-                    All Categories
-                </button>
-                <button onclick="setFilterMode('Basic')" id="btnFilterBasic" class="filter-tab px-3 py-1 rounded-lg text-xs font-semibold bg-slate-50 text-slate-700 hover:bg-slate-200 border border-slate-200 transition">
-                    Basic Milestones
-                </button>
-                <button onclick="setFilterMode('Fabric')" id="btnFilterFabric" class="filter-tab px-3 py-1 rounded-lg text-xs font-semibold bg-slate-50 text-slate-700 hover:bg-slate-200 border border-slate-200 transition">
-                    Fabric Items
-                </button>
-                <button onclick="setFilterMode('Sewing Accs')" id="btnFilterSewing" class="filter-tab px-3 py-1 rounded-lg text-xs font-semibold bg-slate-50 text-slate-700 hover:bg-slate-200 border border-slate-200 transition">
-                    Sewing Accs
-                </button>
-                <button onclick="setFilterMode('Finishing Accs')" id="btnFilterFinishing" class="filter-tab px-3 py-1 rounded-lg text-xs font-semibold bg-slate-50 text-slate-700 hover:bg-slate-200 border border-slate-200 transition">
-                    Finishing Accs
-                </button>
-            </div>
-
-            <!-- Bulk Action for Selected Items & Selection Controls -->
-            <div class="flex flex-wrap items-center gap-2">
-                <button id="bulkActionBtn" onclick="openBulkActionModal()" disabled class="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center space-x-1.5 shadow-sm transition">
-                    <i class="fa-solid fa-list-check"></i>
-                    <span>Action for Selected Items</span>
-                    <span id="selectedCountBadge" class="hidden bg-white text-indigo-700 font-bold px-1.5 py-0.2 rounded-full text-[10px]">0</span>
-                </button>
-                <button onclick="toggleSelectAllVisible()" id="btnSelectAllVisible" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold px-2 py-1 rounded hover:bg-indigo-50 transition">
-                    Select All Visible
-                </button>
-                <button onclick="clearAllSelections()" id="btnClearSelections" class="hidden text-xs text-slate-500 hover:text-red-600 font-medium px-2 py-1 rounded hover:bg-red-50 transition">
-                    Clear Selection
-                </button>
-            </div>
-
-            <!-- Searchable Multi-Select Filters (Styles & Items) -->
-            <div class="flex flex-wrap items-center gap-2">
-                <!-- Style Multi-Select Searchable Dropdown -->
-                <div class="relative" id="styleFilterDropdownWrap">
-                    <div class="flex items-center bg-slate-50 border border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 rounded-lg px-2 py-1 transition w-56 sm:w-64">
-                        <i class="fa-solid fa-shirt text-blue-500 text-[11px] mr-1.5 shrink-0"></i>
-                        <input type="text" id="styleSearchInput"
-                            placeholder="Filter Styles (e.g. 849, JPA)..."
-                            onfocus="openMultiDropdown('style')"
-                            oninput="onMultiSearchInput('style', this.value)"
-                            onkeydown="if(event.key==='Escape') closeAllMultiDropdowns()"
-                            autocomplete="off"
-                            class="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full">
-                        <span id="styleFilterCount" class="hidden ml-1 bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full shrink-0">0</span>
-                        <button type="button" id="styleFilterClearBtn" onclick="clearMultiFilter('style')" title="Clear Style Filter" class="hidden ml-1 text-slate-400 hover:text-red-500 text-xs px-1 shrink-0">
-                            <i class="fa-solid fa-xmark"></i>
-                        </button>
-                        <button type="button" onclick="toggleMultiDropdown('style')" class="ml-0.5 text-slate-400 hover:text-slate-600 text-[10px] px-1 shrink-0" title="Show Style List">
-                            <i class="fa-solid fa-chevron-down"></i>
-                        </button>
-                    </div>
-                    <div id="styleDropdownPanel" class="hidden absolute right-0 sm:left-0 mt-1 w-72 sm:w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-40 overflow-hidden">
-                        <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 flex items-center justify-between text-[11px]">
-                            <span class="font-semibold text-slate-600">Select Styles (<span id="styleMatchCount">{{ style_options|length }}</span>)</span>
-                            <div class="space-x-2">
-                                <button type="button" onclick="selectAllMatchingMulti('style')" class="text-blue-600 hover:underline font-semibold">Select Matching</button>
-                                <button type="button" onclick="clearMultiFilter('style')" class="text-slate-500 hover:text-red-600 font-medium">Clear</button>
+        <!-- Frozen Single-Line Filter & Bulk Action Toolbar (Sticky right below Header) -->
+        <div id="stickyFilterToolbar" class="sticky top-16 z-40 bg-slate-100/95 backdrop-blur-sm pt-1 pb-1.5 -mt-1 space-y-1.5 w-full">
+            <div class="bg-white px-3 py-2 rounded-xl border border-slate-200 shadow-sm flex flex-wrap lg:flex-nowrap items-center justify-between gap-2 w-full">
+                <!-- Left: 3 Multi-Select Searchable Filters (Category, Style, Item) + Expand/Collapse -->
+                <div class="flex flex-wrap md:flex-nowrap items-center gap-2 min-w-0">
+                    <!-- Category Multi-Select Searchable Dropdown -->
+                    <div class="relative" id="categoryFilterDropdownWrap">
+                        <div class="flex items-center bg-slate-50 border border-slate-300 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 rounded-lg px-2 py-1 transition w-40 sm:w-44">
+                            <i class="fa-solid fa-layer-group text-indigo-500 text-[11px] mr-1.5 shrink-0"></i>
+                            <input type="text" id="categorySearchInput"
+                                placeholder="Filter Category..."
+                                onfocus="openMultiDropdown('category')"
+                                oninput="onMultiSearchInput('category', this.value)"
+                                onkeydown="if(event.key==='Escape') closeAllMultiDropdowns()"
+                                autocomplete="off"
+                                class="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full min-w-0">
+                            <span id="categoryFilterCount" class="hidden ml-1 bg-indigo-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full shrink-0">0</span>
+                            <button type="button" id="categoryFilterClearBtn" onclick="clearMultiFilter('category')" title="Clear Category Filter" class="hidden ml-1 text-slate-400 hover:text-red-500 text-xs px-0.5 shrink-0">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                            <button type="button" onclick="toggleMultiDropdown('category')" class="ml-0.5 text-slate-400 hover:text-slate-600 text-[10px] px-0.5 shrink-0" title="Show Category List">
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div id="categoryDropdownPanel" class="hidden absolute left-0 mt-1 w-60 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                            <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 flex items-center justify-between text-[11px]">
+                                <span class="font-semibold text-slate-600">Categories (<span id="categoryMatchCount">{{ category_options|length }}</span>)</span>
+                                <div class="space-x-2">
+                                    <button type="button" onclick="selectAllMatchingMulti('category')" class="text-indigo-600 hover:underline font-semibold">Select Matching</button>
+                                    <button type="button" onclick="clearMultiFilter('category')" class="text-slate-500 hover:text-red-600 font-medium">Clear</button>
+                                </div>
+                            </div>
+                            <div id="categoryDropdownList" class="max-h-56 overflow-y-auto custom-scroll divide-y divide-slate-100 p-1">
+                                {% for cat in category_options %}
+                                <label class="multi-opt-category flex items-center space-x-2 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50/70 cursor-pointer text-xs text-slate-700" data-label="{{ cat|lower }}">
+                                    <input type="checkbox" value="{{ cat|lower }}" data-display="{{ cat }}" onchange="onMultiCheckboxChange('category', this)" class="multi-cb-category rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 w-3.5 h-3.5 shrink-0">
+                                    <span class="truncate font-medium" title="{{ cat }}">{{ cat }}</span>
+                                </label>
+                                {% endfor %}
                             </div>
                         </div>
-                        <div id="styleDropdownList" class="max-h-64 overflow-y-auto custom-scroll divide-y divide-slate-100 p-1">
-                            {% for st in style_options %}
-                            <label class="multi-opt-style flex items-center space-x-2 px-2.5 py-1.5 rounded-lg hover:bg-blue-50/70 cursor-pointer text-xs text-slate-700" data-label="{{ st.name|lower }}">
-                                <input type="checkbox" value="{{ st.id }}" data-display="{{ st.name }}" onchange="onMultiCheckboxChange('style', this)" class="multi-cb-style rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 shrink-0">
-                                <span class="truncate font-medium" title="{{ st.name }}">{{ st.name }}</span>
-                            </label>
-                            {% endfor %}
+                    </div>
+
+                    <!-- Style Multi-Select Searchable Dropdown -->
+                    <div class="relative" id="styleFilterDropdownWrap">
+                        <div class="flex items-center bg-slate-50 border border-slate-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/20 rounded-lg px-2 py-1 transition w-44 sm:w-48 xl:w-56">
+                            <i class="fa-solid fa-shirt text-blue-500 text-[11px] mr-1.5 shrink-0"></i>
+                            <input type="text" id="styleSearchInput"
+                                placeholder="Filter Styles (849, JPA)..."
+                                onfocus="openMultiDropdown('style')"
+                                oninput="onMultiSearchInput('style', this.value)"
+                                onkeydown="if(event.key==='Escape') closeAllMultiDropdowns()"
+                                autocomplete="off"
+                                class="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full min-w-0">
+                            <span id="styleFilterCount" class="hidden ml-1 bg-blue-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full shrink-0">0</span>
+                            <button type="button" id="styleFilterClearBtn" onclick="clearMultiFilter('style')" title="Clear Style Filter" class="hidden ml-1 text-slate-400 hover:text-red-500 text-xs px-0.5 shrink-0">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                            <button type="button" onclick="toggleMultiDropdown('style')" class="ml-0.5 text-slate-400 hover:text-slate-600 text-[10px] px-0.5 shrink-0" title="Show Style List">
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </button>
                         </div>
+                        <div id="styleDropdownPanel" class="hidden absolute left-0 mt-1 w-72 sm:w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                            <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 flex items-center justify-between text-[11px]">
+                                <span class="font-semibold text-slate-600">Select Styles (<span id="styleMatchCount">{{ style_options|length }}</span>)</span>
+                                <div class="space-x-2">
+                                    <button type="button" onclick="selectAllMatchingMulti('style')" class="text-blue-600 hover:underline font-semibold">Select Matching</button>
+                                    <button type="button" onclick="clearMultiFilter('style')" class="text-slate-500 hover:text-red-600 font-medium">Clear</button>
+                                </div>
+                            </div>
+                            <div id="styleDropdownList" class="max-h-64 overflow-y-auto custom-scroll divide-y divide-slate-100 p-1">
+                                {% for st in style_options %}
+                                <label class="multi-opt-style flex items-center space-x-2 px-2.5 py-1.5 rounded-lg hover:bg-blue-50/70 cursor-pointer text-xs text-slate-700" data-label="{{ st.name|lower }}">
+                                    <input type="checkbox" value="{{ st.id }}" data-display="{{ st.name }}" onchange="onMultiCheckboxChange('style', this)" class="multi-cb-style rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 shrink-0">
+                                    <span class="truncate font-medium" title="{{ st.name }}">{{ st.name }}</span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item Multi-Select Searchable Dropdown -->
+                    <div class="relative" id="itemFilterDropdownWrap">
+                        <div class="flex items-center bg-slate-50 border border-slate-300 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 rounded-lg px-2 py-1 transition w-44 sm:w-48 xl:w-56">
+                            <i class="fa-solid fa-tags text-emerald-600 text-[11px] mr-1.5 shrink-0"></i>
+                            <input type="text" id="itemSearchInput"
+                                placeholder="Filter Items (Label, Fabric)..."
+                                onfocus="openMultiDropdown('item')"
+                                oninput="onMultiSearchInput('item', this.value)"
+                                onkeydown="if(event.key==='Escape') closeAllMultiDropdowns()"
+                                autocomplete="off"
+                                class="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full min-w-0">
+                            <span id="itemFilterCount" class="hidden ml-1 bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full shrink-0">0</span>
+                            <button type="button" id="itemFilterClearBtn" onclick="clearMultiFilter('item')" title="Clear Item Filter" class="hidden ml-1 text-slate-400 hover:text-red-500 text-xs px-0.5 shrink-0">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                            <button type="button" onclick="toggleMultiDropdown('item')" class="ml-0.5 text-slate-400 hover:text-slate-600 text-[10px] px-0.5 shrink-0" title="Show Item List">
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div id="itemDropdownPanel" class="hidden absolute left-0 sm:right-0 sm:left-auto mt-1 w-72 sm:w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-50 overflow-hidden">
+                            <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 flex items-center justify-between text-[11px]">
+                                <span class="font-semibold text-slate-600">Select Items (<span id="itemMatchCount">{{ unique_items|length }}</span>)</span>
+                                <div class="space-x-2">
+                                    <button type="button" onclick="selectAllMatchingMulti('item')" class="text-emerald-600 hover:underline font-semibold">Select Matching</button>
+                                    <button type="button" onclick="clearMultiFilter('item')" class="text-slate-500 hover:text-red-600 font-medium">Clear</button>
+                                </div>
+                            </div>
+                            <div id="itemDropdownList" class="max-h-64 overflow-y-auto custom-scroll divide-y divide-slate-100 p-1">
+                                {% for item in unique_items %}
+                                <label class="multi-opt-item flex items-center space-x-2 px-2.5 py-1.5 rounded-lg hover:bg-emerald-50/70 cursor-pointer text-xs text-slate-700" data-label="{{ item|lower }}">
+                                    <input type="checkbox" value="{{ item|lower }}" data-display="{{ item }}" onchange="onMultiCheckboxChange('item', this)" class="multi-cb-item rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 shrink-0">
+                                    <span class="truncate font-medium" title="{{ item }}">{{ item }}</span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-1 whitespace-nowrap shrink-0 pl-1">
+                        <button onclick="expandAllStyles(true)" class="text-xs text-blue-600 hover:underline px-1 py-0.5 font-medium">Expand All</button>
+                        <span class="text-slate-300">|</span>
+                        <button onclick="expandAllStyles(false)" class="text-xs text-slate-500 hover:underline px-1 py-0.5 font-medium">Collapse All</button>
                     </div>
                 </div>
 
-                <!-- Item Multi-Select Searchable Dropdown -->
-                <div class="relative" id="itemFilterDropdownWrap">
-                    <div class="flex items-center bg-slate-50 border border-slate-300 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/20 rounded-lg px-2 py-1 transition w-56 sm:w-64">
-                        <i class="fa-solid fa-tags text-emerald-600 text-[11px] mr-1.5 shrink-0"></i>
-                        <input type="text" id="itemSearchInput"
-                            placeholder="Filter Items (e.g. Label, Fabric)..."
-                            onfocus="openMultiDropdown('item')"
-                            oninput="onMultiSearchInput('item', this.value)"
-                            onkeydown="if(event.key==='Escape') closeAllMultiDropdowns()"
-                            autocomplete="off"
-                            class="bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none w-full">
-                        <span id="itemFilterCount" class="hidden ml-1 bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full shrink-0">0</span>
-                        <button type="button" id="itemFilterClearBtn" onclick="clearMultiFilter('item')" title="Clear Item Filter" class="hidden ml-1 text-slate-400 hover:text-red-500 text-xs px-1 shrink-0">
-                            <i class="fa-solid fa-xmark"></i>
-                        </button>
-                        <button type="button" onclick="toggleMultiDropdown('item')" class="ml-0.5 text-slate-400 hover:text-slate-600 text-[10px] px-1 shrink-0" title="Show Item List">
-                            <i class="fa-solid fa-chevron-down"></i>
-                        </button>
-                    </div>
-                    <div id="itemDropdownPanel" class="hidden absolute right-0 mt-1 w-72 sm:w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-40 overflow-hidden">
-                        <div class="bg-slate-50 px-3 py-2 border-b border-slate-200 flex items-center justify-between text-[11px]">
-                            <span class="font-semibold text-slate-600">Select Items (<span id="itemMatchCount">{{ unique_items|length }}</span>)</span>
-                            <div class="space-x-2">
-                                <button type="button" onclick="selectAllMatchingMulti('item')" class="text-emerald-600 hover:underline font-semibold">Select Matching</button>
-                                <button type="button" onclick="clearMultiFilter('item')" class="text-slate-500 hover:text-red-600 font-medium">Clear</button>
-                            </div>
-                        </div>
-                        <div id="itemDropdownList" class="max-h-64 overflow-y-auto custom-scroll divide-y divide-slate-100 p-1">
-                            {% for item in unique_items %}
-                            <label class="multi-opt-item flex items-center space-x-2 px-2.5 py-1.5 rounded-lg hover:bg-emerald-50/70 cursor-pointer text-xs text-slate-700" data-label="{{ item|lower }}">
-                                <input type="checkbox" value="{{ item|lower }}" data-display="{{ item }}" onchange="onMultiCheckboxChange('item', this)" class="multi-cb-item rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 w-3.5 h-3.5 shrink-0">
-                                <span class="truncate font-medium" title="{{ item }}">{{ item }}</span>
-                            </label>
-                            {% endfor %}
-                        </div>
-                    </div>
+                <!-- Right: Bulk Action for Selected Items & Selection Controls -->
+                <div class="flex items-center gap-2 whitespace-nowrap shrink-0">
+                    <button id="bulkActionBtn" onclick="openBulkActionModal()" disabled class="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white text-xs font-semibold px-3 py-1.5 rounded-lg flex items-center space-x-1.5 shadow-sm transition">
+                        <i class="fa-solid fa-list-check"></i>
+                        <span>Action for Selected Items</span>
+                        <span id="selectedCountBadge" class="hidden bg-white text-indigo-700 font-bold px-1.5 py-0.2 rounded-full text-[10px]">0</span>
+                    </button>
+                    <button onclick="toggleSelectAllVisible()" id="btnSelectAllVisible" class="text-xs text-indigo-600 hover:text-indigo-800 font-semibold px-1.5 py-1 rounded hover:bg-indigo-50 transition">
+                        Select All Visible
+                    </button>
+                    <button onclick="clearAllSelections()" id="btnClearSelections" class="hidden text-xs text-slate-500 hover:text-red-600 font-medium px-1.5 py-1 rounded hover:bg-red-50 transition">
+                        Clear Selection
+                    </button>
                 </div>
-
-                <button onclick="expandAllStyles(true)" class="text-xs text-blue-600 hover:underline px-2 py-0.5 font-medium">Expand All</button>
-                <span class="text-slate-300">|</span>
-                <button onclick="expandAllStyles(false)" class="text-xs text-slate-500 hover:underline px-2 py-0.5 font-medium">Collapse All</button>
             </div>
-        </div>
 
-        <!-- Active Filter Chips Strip (Hidden when no multi-filter chips active) -->
-        <div id="activeFilterChipsBar" class="hidden bg-white px-3 py-2 rounded-xl border border-blue-200 flex flex-wrap items-center gap-1.5 w-full">
-            <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mr-1">Active Filters:</span>
-            <div id="activeFilterChipsList" class="flex flex-wrap items-center gap-1.5"></div>
-            <button type="button" onclick="resetAllMultiFilters()" class="ml-auto text-[11px] text-red-600 hover:underline font-semibold px-2 py-0.5">
-                Reset All Filters
-            </button>
+            <!-- Active Filter Chips Strip (Hidden when no multi-filter chips active) -->
+            <div id="activeFilterChipsBar" class="hidden bg-white px-3 py-1.5 rounded-xl border border-blue-200 shadow-sm flex flex-wrap items-center gap-1.5 w-full">
+                <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mr-1">Active Filters:</span>
+                <div id="activeFilterChipsList" class="flex flex-wrap items-center gap-1.5"></div>
+                <button type="button" onclick="resetAllMultiFilters()" class="ml-auto text-[11px] text-red-600 hover:underline font-semibold px-2 py-0.5">
+                    Reset All Filters
+                </button>
+            </div>
         </div>
 
         <!-- Styles & T&A Board (100% Full Width) -->
@@ -626,13 +647,23 @@ HTML_TEMPLATE = """
             elem.style.height = (elem.scrollHeight) + 'px';
         }
 
-        // Initialize all textareas on load
+        function syncStickyToolbarOffset() {
+            const hdr = document.getElementById('topHeader');
+            const bar = document.getElementById('stickyFilterToolbar');
+            if (hdr && bar) {
+                bar.style.top = hdr.offsetHeight + 'px';
+            }
+        }
+
+        // Initialize all textareas and sticky bar offset on load
         window.addEventListener('DOMContentLoaded', () => {
+            syncStickyToolbarOffset();
             document.querySelectorAll('textarea.auto-expand').forEach(ta => {
                 autoExpandTextarea(ta);
             });
             applyFilters();
         });
+        window.addEventListener('resize', syncStickyToolbarOffset);
 
         function toggleStyleAccordion(styleId) {
             const body = document.getElementById(`body_${styleId}`);
@@ -669,23 +700,14 @@ HTML_TEMPLATE = """
             applyFilters();
         }
 
-        function setFilterMode(cat) {
-            currentCategoryFilter = cat;
-            document.querySelectorAll('.filter-tab').forEach(btn => {
-                btn.className = "filter-tab px-3 py-1 rounded-lg text-xs font-semibold bg-slate-50 text-slate-700 hover:bg-slate-200 border border-slate-200 transition";
-            });
-            const activeId = cat === 'all' ? 'btnFilterAll' : (cat === 'Basic' ? 'btnFilterBasic' : (cat === 'Fabric' ? 'btnFilterFabric' : (cat === 'Sewing Accs' ? 'btnFilterSewing' : 'btnFilterFinishing')));
-            const activeBtn = document.getElementById(activeId);
-            if (activeBtn) activeBtn.className = "filter-tab px-3 py-1 rounded-lg text-xs font-semibold bg-blue-600 text-white shadow-sm transition";
-            applyFilters();
-        }
-
-        let selectedStyles = new Map(); // styleId -> display label
-        let selectedItems = new Map();  // lower(itemName) -> display label
+        let selectedCategories = new Map(); // lower(category) -> display label
+        let selectedStyles = new Map();     // styleId -> display label
+        let selectedItems = new Map();      // lower(itemName) -> display label
 
         function getMultiState(kind) {
+            const map = kind === 'category' ? selectedCategories : (kind === 'style' ? selectedStyles : selectedItems);
             return {
-                map: kind === 'style' ? selectedStyles : selectedItems,
+                map,
                 panel: document.getElementById(kind + 'DropdownPanel'),
                 input: document.getElementById(kind + 'SearchInput'),
                 badge: document.getElementById(kind + 'FilterCount'),
@@ -715,7 +737,7 @@ HTML_TEMPLATE = """
         }
 
         function closeAllMultiDropdowns(exceptKind = null) {
-            ['style', 'item'].forEach(k => {
+            ['category', 'style', 'item'].forEach(k => {
                 if (k !== exceptKind) {
                     const p = document.getElementById(k + 'DropdownPanel');
                     if (p) p.classList.add('hidden');
@@ -724,14 +746,12 @@ HTML_TEMPLATE = """
         }
 
         document.addEventListener('click', (e) => {
-            const styleWrap = document.getElementById('styleFilterDropdownWrap');
-            const itemWrap = document.getElementById('itemFilterDropdownWrap');
-            if (styleWrap && !styleWrap.contains(e.target)) {
-                document.getElementById('styleDropdownPanel')?.classList.add('hidden');
-            }
-            if (itemWrap && !itemWrap.contains(e.target)) {
-                document.getElementById('itemDropdownPanel')?.classList.add('hidden');
-            }
+            ['category', 'style', 'item'].forEach(k => {
+                const wrap = document.getElementById(k + 'FilterDropdownWrap');
+                if (wrap && !wrap.contains(e.target)) {
+                    document.getElementById(k + 'DropdownPanel')?.classList.add('hidden');
+                }
+            });
         });
 
         function filterMultiOptions(kind, query) {
@@ -797,6 +817,7 @@ HTML_TEMPLATE = """
         }
 
         function resetAllMultiFilters() {
+            clearMultiFilter('category');
             clearMultiFilter('style');
             clearMultiFilter('item');
         }
@@ -830,7 +851,8 @@ HTML_TEMPLATE = """
                 const span = document.createElement('span');
                 span.className = `inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${colorClasses}`;
                 const txt = document.createElement('span');
-                txt.textContent = (kind === 'style' ? 'Style: ' : 'Item: ') + label;
+                const prefix = kind === 'category' ? 'Category: ' : (kind === 'style' ? 'Style: ' : 'Item: ');
+                txt.textContent = prefix + label;
                 const btn = document.createElement('button');
                 btn.type = 'button';
                 btn.className = 'hover:text-red-600 focus:outline-none ml-1';
@@ -849,10 +871,11 @@ HTML_TEMPLATE = """
                 list.appendChild(span);
             };
 
+            selectedCategories.forEach((label, key) => addChip('category', key, label, 'bg-indigo-50 text-indigo-800 border-indigo-200'));
             selectedStyles.forEach((label, key) => addChip('style', key, label, 'bg-blue-50 text-blue-800 border-blue-200'));
             selectedItems.forEach((label, key) => addChip('item', key, label, 'bg-emerald-50 text-emerald-800 border-emerald-200'));
 
-            if (selectedStyles.size > 0 || selectedItems.size > 0) {
+            if (selectedCategories.size > 0 || selectedStyles.size > 0 || selectedItems.size > 0) {
                 bar.classList.remove('hidden');
             } else {
                 bar.classList.add('hidden');
@@ -861,8 +884,11 @@ HTML_TEMPLATE = """
 
         function applyFilters() {
             const hideCompleted = document.getElementById('hideCompletedCheck').checked;
+            const catQuery = (document.getElementById('categorySearchInput')?.value || '').trim().toLowerCase();
             const styleQuery = (document.getElementById('styleSearchInput')?.value || '').trim().toLowerCase();
             const itemQuery = (document.getElementById('itemSearchInput')?.value || '').trim().toLowerCase();
+
+            const isFilteringCategory = (selectedCategories.size > 0 || catQuery !== '');
             const isFilteringStyle = (selectedStyles.size > 0 || styleQuery !== '');
             const isFilteringItem = (selectedItems.size > 0 || itemQuery !== '');
 
@@ -870,11 +896,17 @@ HTML_TEMPLATE = """
             const visibleCountByStyle = {};
 
             rows.forEach(r => {
-                const cat = r.getAttribute('data-category');
+                const cat = (r.getAttribute('data-category') || '').toLowerCase();
                 const itemName = (r.getAttribute('data-item-name') || '').toLowerCase();
                 const isClosed = r.classList.contains('is-closed-task');
 
-                let matchCat = (currentCategoryFilter === 'all' || cat === currentCategoryFilter);
+                let matchCat = true;
+                if (selectedCategories.size > 0) {
+                    matchCat = selectedCategories.has(cat);
+                } else if (catQuery !== '') {
+                    matchCat = cat.includes(catQuery);
+                }
+
                 let matchItem = true;
                 if (selectedItems.size > 0) {
                     matchItem = selectedItems.has(itemName);
@@ -913,11 +945,11 @@ HTML_TEMPLATE = """
                 }
 
                 const count = visibleCountByStyle[styleId] || 0;
-                const hasVisibleContent = (count > 0 || (!isFilteringItem && currentCategoryFilter === 'all' && !hideCompleted));
+                const hasVisibleContent = (count > 0 || (!isFilteringItem && !isFilteringCategory && !hideCompleted));
 
                 if (matchStyle && hasVisibleContent) {
                     card.style.display = '';
-                    if (isFilteringItem || isFilteringStyle) {
+                    if (isFilteringItem || isFilteringStyle || isFilteringCategory) {
                         const body = document.getElementById(`body_${styleId}`);
                         const arrow = document.getElementById(`arrow_${styleId}`);
                         if (body) {
@@ -1394,6 +1426,7 @@ def index():
     styles = storage.get_styles_by_buyer(current_buyer.get("code"))
 
     items_map = {}
+    cats_seen = set()
     style_options = []
     total_styles = len(styles)
     pending_count = 0
@@ -1402,7 +1435,11 @@ def index():
     for sid, s in styles.items():
         s_name = (s.get("style_name") or sid).strip()
         style_options.append({"id": sid, "name": s_name})
-        for t in s.get("tasks", []):
+        s["tasks"] = sort_tasks(s.get("tasks", []))
+        for t in s["tasks"]:
+            cat_val = (t.get("category") or "").strip()
+            if cat_val:
+                cats_seen.add(cat_val)
             item_name = (t.get("item_name") or "").strip()
             if item_name:
                 items_map.setdefault(item_name.lower(), item_name)
@@ -1411,6 +1448,9 @@ def index():
             else:
                 pending_count += 1
 
+    base_cats = ["Basic", "Fabric", "Sewing Accs", "Finishing Accs"]
+    extra_cats = sorted([c for c in cats_seen if c not in base_cats], key=lambda x: x.lower())
+    category_options = base_cats + extra_cats
     unique_items = sorted(items_map.values(), key=lambda x: x.lower())
     style_options.sort(key=lambda x: x["name"].lower())
 
@@ -1423,7 +1463,8 @@ def index():
         pending_count=pending_count,
         closed_count=closed_count,
         unique_items=unique_items,
-        style_options=style_options
+        style_options=style_options,
+        category_options=category_options
     )
 
 @app.route("/api/set-buyer", methods=["POST"])

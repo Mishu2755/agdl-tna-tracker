@@ -5,6 +5,7 @@ import threading
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+from task_engine import sort_tasks
 
 try:
     import psycopg2
@@ -348,6 +349,7 @@ class TNAStorage:
         task_data["is_custom"] = True
         task_data["last_modified"] = datetime.now().strftime("%Y-%m-%d %H:%M")
         style["tasks"].append(task_data)
+        style["tasks"] = sort_tasks(style["tasks"])
         self.save()
 
     def delete_task(self, costing_id: str, task_id: str):

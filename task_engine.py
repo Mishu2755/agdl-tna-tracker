@@ -76,16 +76,18 @@ def sort_tasks(tasks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
     Sorts tasks strictly:
     1. Category order: Basic > Fabric > Sewing Accs > Finishing Accs.
-    2. Inside Basic: Any Data Sheet > Pretest > QA Status > PP/Garment Test > Overall Close > PP Status > Style Close.
-    3. Inside other categories: Alphabetical by item name.
+    2. Inside Basic: Any Data Sheet > Pretest > QA Status > PP/Garment Test > Overall Close > PP Status > Style Close, followed by custom Basic items.
+    3. Inside other categories: Standard costing items sorted alphabetically, followed by newly added custom items in that category.
     """
     def task_sort_tuple(t: Dict[str, Any]):
         cat = t.get("category", "")
         cat_rank = CATEGORY_ORDER.get(cat, 99)
+        name_lower = (t.get("item_name") or "").strip().lower()
+        custom_rank = 1 if t.get("is_custom") else 0
         if cat == "Basic":
-            b_rank = get_basic_sort_key(t.get("item_name", ""))
-            return (cat_rank, b_rank, t.get("item_name", ""))
-        return (cat_rank, 0, t.get("item_name", ""))
+            b_rank = get_basic_sort_key(name_lower)
+            return (cat_rank, b_rank, custom_rank, name_lower)
+        return (cat_rank, custom_rank, 0, name_lower)
 
     return sorted(tasks, key=task_sort_tuple)
 
